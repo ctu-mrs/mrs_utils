@@ -1,0 +1,26 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+  <arg name="frame_parent" default="frame_parent"/>
+  <arg name="frame_child" default="frame_child"/>
+  <arg name="frame_grandchild" default="frame_grandchild"/>
+  <arg name="publish_rate" default="10"/>
+  <arg name="debug" default="false" />
+
+  <arg unless="$(arg debug)" name="launch_prefix" value=""/>
+  <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
+
+  <node pkg="nodelet" type="nodelet" name="tf_reconfigure" args="standalone tf_reconfigure/TfReconfigure" output="screen" launch-prefix="$(arg launch_prefix)" >
+
+    <param name="uav_name" type="string" value="$(arg uav_name)" />
+    <param name="frame_parent" type="string" value="$(arg frame_parent)" />
+    <param name="frame_child" type="string" value="$(arg frame_child)" />
+    <param name="frame_grandchild" type="string" value="$(arg frame_grandchild)" />
+    <param name="publish_rate" type="int" value="$(arg publish_rate)" />
+
+        <!-- Subscribers -->
+    <remap from="~tf_in" to="/tf" />
+
+  </node>
+
+</launch>
