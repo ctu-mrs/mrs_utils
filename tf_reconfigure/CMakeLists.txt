@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   mrs_lib
   dynamic_reconfigure
   tf
+  nodelet
   )
 
 generate_dynamic_reconfigure_options(
@@ -31,9 +32,13 @@ add_library(TfReconfigure
   src/TfReconfigure.cpp
   )
 
-add_dependencies(TfReconfigure ${PROJECT_NAME}_gencfg)
+add_dependencies(TfReconfigure
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_gencfg
+  )
 
 target_link_libraries(TfReconfigure
   ${LIBS}
+  ${catkin_LIBRARIES}
   )
 
