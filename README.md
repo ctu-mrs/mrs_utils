@@ -8,4 +8,8 @@
 
 This repository contains various useful tools for developement and testing. Use along with the [MRS UAV system](https://github.com/ctu-mrs/mrs_uav_system).
 
-* Online documentation: [https://ctu-mrs.github.io/mrs_utils](https://ctu-mrs.github.io/mrs_utils).
+Contains the following packages
+
+* `tf_reconfigure`: Helper tool for defining a complex transformation as a combination of up to three chained simple transofmrations.
+
+* `tf_estimator`: A tool for calculating an affine transformation to align a trajectory measured in two different coordinate systems.
