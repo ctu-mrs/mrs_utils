@@ -71,7 +71,7 @@ void EulerCounterExample::onInit() {
 
   // | --------------------------- drs -------------------------- |
 
-  params_.type        = 3;
+  params_.type        = 4;
   params_.apply_angle = false;
   params_.thrust_x    = 0.2;
   params_.thrust_y    = 0.3;
@@ -152,6 +152,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
 
   switch (params.type) {
 
+    // yaw intrinsic
     case 0: {
 
       auto [roll, pitch, yaw] = mrs_lib::AttitudeConverter(R1).getIntrinsicRPY();
@@ -167,6 +168,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
+      // yaw extrinsic
     case 1: {
 
       auto [roll, pitch, yaw] = mrs_lib::AttitudeConverter(R1).getExtrinsicRPY();
@@ -182,6 +184,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
+      // heading_oblique
     case 2: {
 
       // | ------------------------- body x ------------------------- |
@@ -228,7 +231,31 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
+    // heading oblique
     case 3: {
+
+      Eigen::Vector3d heading_vec;
+
+      if (params.apply_angle) {
+        heading_vec << cos(params.angle), sin(params.angle), 0;
+      } else {
+
+        double current_heading = mrs_lib::AttitudeConverter(R1).getHeading();
+
+        heading_vec << cos(current_heading), sin(current_heading), 0;
+      }
+
+      R1.col(2) = body_z;
+      R1.col(1) = R1.col(2).cross(heading_vec);
+      R1.col(1).normalize();
+      R1.col(0) = R1.col(1).cross(R1.col(2));
+      R1.col(0).normalize();
+
+      break;
+    }
+
+      // none
+    case 4: {
 
       break;
     }
