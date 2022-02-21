@@ -1,0 +1,5 @@
+<library path="lib/libEulerCounterExample">
+  <class name="euler_counter_example/EulerCounterExample" type="euler_counter_example::EulerCounterExample" base_class_type="nodelet::Nodelet">
+    <description>EulerCounterExample nodelet</description>
+  </class>
+</library>
