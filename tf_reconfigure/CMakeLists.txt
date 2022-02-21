@@ -17,8 +17,12 @@ generate_dynamic_reconfigure_options(
   config/tf.cfg
   )
 
+set(LIBRARIES
+  TfReconfigure
+  )
+
 catkin_package(
-  LIBRARIES TfReconfigure
+  LIBRARIES ${LIBRARIES}
   INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp mrs_lib
   )
@@ -42,3 +46,16 @@ target_link_libraries(TfReconfigure
   ${catkin_LIBRARIES}
   )
 
+## --------------------------------------------------------------
+## |                           Install                          |
+## --------------------------------------------------------------
+
+install(TARGETS ${LIBRARIES}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+  )
+
+install(DIRECTORY launch config rviz start
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
