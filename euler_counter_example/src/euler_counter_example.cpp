@@ -229,51 +229,14 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       // heading_oblique
     case 4: {
 
-      // | ------------------------- body x ------------------------- |
-
-      Eigen::Vector3d heading_vec;
-
       if (params.apply_angle) {
-        heading_vec << cos(params.angle), sin(params.angle), 0;
-      } else {
-
-        double current_heading = mrs_lib::AttitudeConverter(R1).getHeading();
-
-        heading_vec << cos(current_heading), sin(current_heading), 0;
+        R1 = mrs_lib::AttitudeConverter(R1).setHeading(params.angle);
       }
-
-      ROS_INFO_THROTTLE(1.0, "[EulerCounterExample]: Heading by oblique projection");
-
-      // construct the oblique projection
-      Eigen::Matrix3d projector_body_z_compl = (Eigen::Matrix3d::Identity(3, 3) - body_z * body_z.transpose());
-
-      // create a basis of the body-z complement subspace
-      Eigen::MatrixXd A = Eigen::MatrixXd(3, 2);
-      A.col(0)          = projector_body_z_compl.col(0);
-      A.col(1)          = projector_body_z_compl.col(1);
-
-      // create the basis of the projection null-space complement
-      Eigen::MatrixXd B = Eigen::MatrixXd(3, 2);
-      B.col(0)          = Eigen::Vector3d(1, 0, 0);
-      B.col(1)          = Eigen::Vector3d(0, 1, 0);
-
-      // oblique projector to <range_basis>
-      Eigen::MatrixXd Bt_A               = B.transpose() * A;
-      Eigen::MatrixXd Bt_A_pseudoinverse = ((Bt_A.transpose() * Bt_A).inverse()) * Bt_A.transpose();
-      Eigen::MatrixXd oblique_projector  = A * Bt_A_pseudoinverse * B.transpose();
-
-      R1.col(0) = oblique_projector * heading_vec;
-      R1.col(0).normalize();
-
-      // | ------------------------- body y ------------------------- |
-
-      R1.col(1) = R1.col(2).cross(R1.col(0));
-      R1.col(1).normalize();
 
       break;
     }
 
-    // heading oblique
+    // heading_ortho
     case 5: {
 
       Eigen::Vector3d heading_vec;
