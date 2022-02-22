@@ -71,7 +71,7 @@ void EulerCounterExample::onInit() {
 
   // | --------------------------- drs -------------------------- |
 
-  params_.type        = 4;
+  params_.type        = 5;
   params_.apply_angle = false;
   params_.thrust_x    = 0.2;
   params_.thrust_y    = 0.3;
@@ -152,7 +152,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
 
   switch (params.type) {
 
-    // yaw intrinsic
+    // rpy yaw intrinsic
     case 0: {
 
       auto [roll, pitch, yaw] = mrs_lib::AttitudeConverter(R1).getIntrinsicRPY();
@@ -168,7 +168,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
-      // yaw extrinsic
+      // rpy yaw extrinsic
     case 1: {
 
       auto [roll, pitch, yaw] = mrs_lib::AttitudeConverter(R1).getExtrinsicRPY();
@@ -184,8 +184,29 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
-      // heading_oblique
+      // ypr yaw extrinsic
     case 2: {
+
+      Eigen::Vector3d eulers = R1.eulerAngles(0, 1, 2);
+
+      double yaw   = eulers[2];
+      double pitch = eulers[1];
+      double roll  = eulers[0];
+
+      ROS_INFO_THROTTLE(1.0, "[EulerCounterExample]: Extrinsic YPR: [%.2f, %.2f, %.2f]", yaw, pitch, roll);
+
+      if (params.apply_angle) {
+        yaw = params.angle;
+      }
+
+      R1 = Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+           Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ());
+
+      break;
+    }
+
+      // heading_oblique
+    case 3: {
 
       // | ------------------------- body x ------------------------- |
 
@@ -232,7 +253,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
     }
 
     // heading oblique
-    case 3: {
+    case 4: {
 
       Eigen::Vector3d heading_vec;
 
@@ -255,7 +276,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
     }
 
       // none
-    case 4: {
+    case 5: {
 
       break;
     }
