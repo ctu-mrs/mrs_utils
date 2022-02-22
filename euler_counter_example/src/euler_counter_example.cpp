@@ -71,7 +71,7 @@ void EulerCounterExample::onInit() {
 
   // | --------------------------- drs -------------------------- |
 
-  params_.type        = 5;
+  params_.type        = 6;
   params_.apply_angle = false;
   params_.thrust_x    = 0.2;
   params_.thrust_y    = 0.3;
@@ -184,8 +184,29 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
       break;
     }
 
-      // ypr yaw extrinsic
+      // ypr yaw intrinsic
     case 2: {
+
+      Eigen::Vector3d eulers = R1.eulerAngles(2, 1, 0);
+
+      double yaw   = eulers[0];
+      double pitch = eulers[1];
+      double roll  = eulers[2];
+
+      ROS_INFO_THROTTLE(1.0, "[EulerCounterExample]: Intrinsic YPR: [%.2f, %.2f, %.2f]", yaw, pitch, roll);
+
+      if (params.apply_angle) {
+        yaw = params.angle;
+      }
+
+      R1 = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()) * Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY()) *
+           Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX());
+
+      break;
+    }
+
+      // ypr yaw extrinsic
+    case 3: {
 
       Eigen::Vector3d eulers = R1.eulerAngles(0, 1, 2);
 
@@ -206,7 +227,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
     }
 
       // heading_oblique
-    case 3: {
+    case 4: {
 
       // | ------------------------- body x ------------------------- |
 
@@ -253,7 +274,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
     }
 
     // heading oblique
-    case 4: {
+    case 5: {
 
       Eigen::Vector3d heading_vec;
 
@@ -276,7 +297,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
     }
 
       // none
-    case 5: {
+    case 6: {
 
       break;
     }
