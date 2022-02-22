@@ -19,17 +19,22 @@ find_package(catkin REQUIRED COMPONENTS
   )
 
 generate_dynamic_reconfigure_options(
-  config/euler.cfg
+  config/euler_counter_example.cfg
+  )
+
+set(LIBRARIES
+  EulerCounterExample
   )
 
 catkin_package(
-  LIBRARIES EulerCounterExample
+  LIBRARIES ${LIBRARIES}
   CATKIN_DEPENDS roscpp mrs_lib
   DEPENDS Eigen
   )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
   )
 
 add_library(EulerCounterExample
@@ -46,3 +51,26 @@ target_link_libraries(EulerCounterExample
   ${catkin_LIBRARIES}
   )
 
+## --------------------------------------------------------------
+## |                           Install                          |
+## --------------------------------------------------------------
+
+install(TARGETS ${LIBRARIES}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+  )
+
+install(DIRECTORY tmux
+  USE_SOURCE_PERMISSIONS
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
+
+install(DIRECTORY launch config
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
+
+install(DIRECTORY ./
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  FILES_MATCHING PATTERN "*.xml"
+  )
