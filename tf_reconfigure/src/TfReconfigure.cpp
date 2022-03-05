@@ -136,9 +136,9 @@ void TfReconfigure::callbackReconfigure([[maybe_unused]] tf_reconfigure::tfConfi
   broadcastTransforms();
   broadcastTransforms();
 
-  mrs_lib::TransformStamped tf;
+  geometry_msgs::TransformStamped tf;
 
-  std::optional<mrs_lib::TransformStamped> ret;
+  std::optional<geometry_msgs::TransformStamped> ret;
 
   if (modified_g_g_child_) {
     ret = transformer_->getTransform(frame_greatgrandchild_, frame_parent_, ros::Time::now());
@@ -154,11 +154,11 @@ void TfReconfigure::callbackReconfigure([[maybe_unused]] tf_reconfigure::tfConfi
     ROS_ERROR_STREAM("[Tf Reconfigure]: Error in TF transforming!");
   }
   ROS_INFO_STREAM(" \n\n\n\n\n\n\n\n -------------------------------------------- \n");
-  ROS_INFO_STREAM("TF:\n" << tf.getTransform().transform);
+  ROS_INFO_STREAM("TF:\n" << tf.transform);
 
   double         sim_yaw, sim_pitch, sim_roll;
   tf::Quaternion quaternion;
-  quaternionMsgToTF(tf.getTransform().transform.rotation, quaternion);
+  quaternionMsgToTF(tf.transform.rotation, quaternion);
   tf::Matrix3x3 m(quaternion);
 
   m.getRPY(sim_roll, sim_pitch, sim_yaw);
