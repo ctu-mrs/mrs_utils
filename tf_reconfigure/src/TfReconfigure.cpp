@@ -33,6 +33,7 @@ void TfReconfigure::onInit() {
   reconfigure_server_->setCallback(f);
 
   transformer_ = std::make_unique<mrs_lib::Transformer>("tf_reconfigure");
+  transformer_->retryLookupNewest(true);
 
   is_initialized_ = true;
 
