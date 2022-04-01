@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>multireconfigure</name>
+  <version>1.0.0</version>
+  <description>A package for dynamic reconfiguration of multiple nodes at the same time</description>
+
+  <maintainer email="matous.vrba@fel.cvut.cz">Matouš Vrba</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cmake_modules</depend>
+  <depend>rospy</depend>
+  <depend>message_runtime</depend>
+
+</package>
