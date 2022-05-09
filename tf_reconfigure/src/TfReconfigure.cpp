@@ -12,6 +12,13 @@ void TfReconfigure::onInit() {
 
   ros::Time::waitForValid();
 
+  mrs_lib::ParamLoader pl(nh_);
+
+  pl.loadParam("frame_parent", frame_parent_, std::string("parent"));
+  pl.loadParam("frame_child", frame_child_, std::string("child"));
+  pl.loadParam("frame_grandchild", frame_grandchild_, std::string("g_child"));
+  pl.loadParam("frame_greatgrandchild", frame_greatgrandchild_, std::string("g_g_child"));
+
 
   timer_tf_ = nh_.createTimer(ros::Rate(rate_timer_tf_), &TfReconfigure::timerTf, this);
 
