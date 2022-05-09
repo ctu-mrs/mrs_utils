@@ -14,7 +14,7 @@
   <node pkg="nodelet" type="nodelet" name="tf_reconfigure" args="standalone tf_reconfigure/TfReconfigure" output="screen" launch-prefix="$(arg launch_prefix)" >
 
     <param name="uav_name" type="string" value="$(arg uav_name)" />
-    <param name="frame_parent" type="string" value="blb" />
+    <param name="frame_parent" type="string" value="$(arg frame_parent)" />
     <param name="frame_child" type="string" value="$(arg frame_child)" />
     <param name="frame_grandchild" type="string" value="$(arg frame_grandchild)" />
     <param name="frame_grandgrandchild" type="string" value="$(arg frame_grandgrandchild)" />
