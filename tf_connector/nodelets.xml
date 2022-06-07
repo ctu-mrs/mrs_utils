@@ -1,0 +1,5 @@
+<library path="lib/libTFConnector">
+  <class name="tf_connector/TFConnector" type="tf_connector::TFConnector" base_class_type="nodelet::Nodelet">
+    <description>TFConnector nodelet</description>
+  </class>
+</library>
