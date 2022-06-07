@@ -13,10 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
   )
 
-generate_dynamic_reconfigure_options(
-  config/tf_connector.cfg
-  )
-
 set(LIBRARIES
   TFConnector
   )
