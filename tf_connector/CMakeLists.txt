@@ -33,7 +33,6 @@ add_library(TFConnector
 
 add_dependencies(TFConnector
   ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_gencfg
   )
 
 target_link_libraries(TFConnector
