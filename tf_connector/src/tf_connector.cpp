@@ -234,8 +234,8 @@ namespace tf_connector
       pl.loadParam("connecting_frame_id", m_connecting_frame_id);
       const auto root_frame_ids = pl.loadParam2<std::vector<std::string>>("root_frame_ids");
       const auto equal_frame_ids = pl.loadParam2<std::vector<std::string>>("equal_frame_ids");
-      pl.loadParam("ignore_older_messages", m_ignore_older_msgs, false);
-      pl.loadParam("max_update_period", m_max_update_period, ros::Duration(0));
+      pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
+      pl.loadParam("max_update_period", m_max_update_period);
 
       const auto offsets = load_offsets(pl);
 
