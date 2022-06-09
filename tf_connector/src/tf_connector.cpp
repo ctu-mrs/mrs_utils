@@ -50,6 +50,7 @@ namespace tf_connector
       ros::Time last_update;
     };
 
+    std::mutex m_mtx;
     std::string m_connecting_frame_id;
     using connection_vec_t = std::vector<std::shared_ptr<frame_connection_t>>;
     connection_vec_t m_frame_connections;
@@ -65,6 +66,58 @@ namespace tf_connector
     ros::Duration m_max_update_period = ros::Duration(0.1);
 
   public:
+
+    /* tf_callback() method //{ */
+
+    void tf_callback(tf2_msgs::TFMessageConstPtr msg_ptr)
+    {
+      std::scoped_lock lck(m_mtx);
+      check_timejump();
+
+      const tf2_msgs::TFMessage& tf_msg = *msg_ptr;
+      connection_vec_t changed_connections;
+      for (const geometry_msgs::TransformStamped& tf : tf_msg.transforms)
+      {
+        // check whether this frame id is of interest
+        for (const auto& con_ptr : m_frame_connections)
+        {
+          // skip connections that have the same equal and root frame
+          // to avoid weird publish/callback loops
+          if (con_ptr->same_frames)
+            continue;
+
+          const auto& trigger_frame_id = con_ptr->equal_frame_id;
+          if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || tf.header.stamp > con_ptr->last_update))
+            changed_connections.push_back(con_ptr);
+        }
+      }
+    
+      // if no interesting frame was changed, ignore the message
+      if (changed_connections.empty())
+        return;
+    
+      update_tfs(changed_connections);
+    }
+
+    //}
+
+    /* timer_callback() method //{ */
+    void timer_callback([[maybe_unused]] const ros::TimerEvent&)
+    {
+      std::scoped_lock lck(m_mtx);
+      check_timejump();
+      const ros::Time now = ros::Time::now();
+      const ros::Duration max_duration(0.99*m_max_update_period.toSec());
+    
+      connection_vec_t changed_connections;
+      for (const auto& con_ptr : m_frame_connections)
+      {
+        if (now - con_ptr->last_update >= max_duration)
+          changed_connections.push_back(con_ptr);
+      }
+      update_tfs(changed_connections);
+    }
+    //}
 
     /* update_tfs() method //{ */
 
@@ -120,49 +173,18 @@ namespace tf_connector
 
     //}
 
-    /* tf_callback() method //{ */
-
-    void tf_callback(tf2_msgs::TFMessageConstPtr msg_ptr)
-    {
-      const tf2_msgs::TFMessage& tf_msg = *msg_ptr;
-      connection_vec_t changed_connections;
-      for (const geometry_msgs::TransformStamped& tf : tf_msg.transforms)
-      {
-        // check whether this frame id is of interest
-        for (const auto& con_ptr : m_frame_connections)
-        {
-          // skip connections that have the same equal and root frame
-          // to avoid weird publish/callback loops
-          if (con_ptr->same_frames)
-            continue;
-
-          const auto& trigger_frame_id = con_ptr->equal_frame_id;
-          if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || tf.header.stamp > con_ptr->last_update))
-            changed_connections.push_back(con_ptr);
-        }
-      }
-    
-      // if no interesting frame was changed, ignore the message
-      if (changed_connections.empty())
-        return;
-    
-      update_tfs(changed_connections);
-    }
-
-    //}
-
-    /* timer_callback() method //{ */
-    void timer_callback([[maybe_unused]] const ros::TimerEvent&)
+    /* check_timejump() method //{ */
+    void check_timejump()
     {
       const ros::Time now = ros::Time::now();
-    
-      connection_vec_t changed_connections;
-      for (const auto& con_ptr : m_frame_connections)
+      static ros::Time prev_now = now;
+      if (now < prev_now)
       {
-        if (now - con_ptr->last_update > m_max_update_period)
-          changed_connections.push_back(con_ptr);
+        ROS_WARN_THROTTLE(1.0, "[%s]: Detected a jump in time, resetting.", m_node_name.c_str());
+        for (auto& con_ptr : m_frame_connections)
+          con_ptr->last_update = now;
       }
-      update_tfs(changed_connections);
+      prev_now = now;
     }
     //}
 
