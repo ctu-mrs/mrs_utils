@@ -53,6 +53,7 @@ namespace tf_connector
     std::string m_connecting_frame_id;
     using connection_vec_t = std::vector<std::shared_ptr<frame_connection_t>>;
     connection_vec_t m_frame_connections;
+    bool m_ignore_older_msgs;
 
     tf2_ros::Buffer m_tf_buffer;
     std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
@@ -103,7 +104,7 @@ namespace tf_connector
         // apply the offset
         tf2::Transform tf;
         tf2::fromMsg(new_tf.transform, tf);
-        tf = con_ptr->offset_tf * tf;
+        tf = tf * con_ptr->offset_tf;
         new_tf.transform = tf2::toMsg(tf);
 
         new_tf_msg.transforms.push_back(new_tf);
@@ -136,7 +137,7 @@ namespace tf_connector
             continue;
 
           const auto& trigger_frame_id = con_ptr->equal_frame_id;
-          if (tf.child_frame_id == trigger_frame_id)
+          if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || tf.header.stamp > con_ptr->last_update))
             changed_connections.push_back(con_ptr);
         }
       }
@@ -233,6 +234,7 @@ namespace tf_connector
       pl.loadParam("connecting_frame_id", m_connecting_frame_id);
       const auto root_frame_ids = pl.loadParam2<std::vector<std::string>>("root_frame_ids");
       const auto equal_frame_ids = pl.loadParam2<std::vector<std::string>>("equal_frame_ids");
+      pl.loadParam("ignore_older_messages", m_ignore_older_msgs, false);
 
       const auto offsets = load_offsets(pl);
 
