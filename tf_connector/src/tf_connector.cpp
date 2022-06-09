@@ -48,6 +48,7 @@ namespace tf_connector
       tf2::Transform offset_tf;
       bool same_frames;
       ros::Time last_update;
+      ros::Time change_time;
     };
 
     std::mutex m_mtx;
@@ -72,23 +73,28 @@ namespace tf_connector
     void tf_callback(tf2_msgs::TFMessageConstPtr msg_ptr)
     {
       std::scoped_lock lck(m_mtx);
-      check_timejump();
+      const ros::Time now = ros::Time::now();
+      check_timejump(now);
 
       const tf2_msgs::TFMessage& tf_msg = *msg_ptr;
       connection_vec_t changed_connections;
       for (const geometry_msgs::TransformStamped& tf : tf_msg.transforms)
       {
         // check whether this frame id is of interest
-        for (const auto& con_ptr : m_frame_connections)
+        for (auto& con_ptr : m_frame_connections)
         {
           // skip connections that have the same equal and root frame
           // to avoid weird publish/callback loops
           if (con_ptr->same_frames)
             continue;
 
+          // TODO: check all frames in the chain, not just the last frame
           const auto& trigger_frame_id = con_ptr->equal_frame_id;
           if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || tf.header.stamp > con_ptr->last_update))
+          {
+            con_ptr->change_time = tf.header.stamp;
             changed_connections.push_back(con_ptr);
+          }
         }
       }
     
@@ -96,7 +102,7 @@ namespace tf_connector
       if (changed_connections.empty())
         return;
     
-      update_tfs(changed_connections);
+      update_tfs(changed_connections, now);
     }
 
     //}
@@ -105,9 +111,9 @@ namespace tf_connector
     void timer_callback([[maybe_unused]] const ros::TimerEvent&)
     {
       std::scoped_lock lck(m_mtx);
-      check_timejump();
       const ros::Time now = ros::Time::now();
       const ros::Duration max_duration(0.99*m_max_update_period.toSec());
+      check_timejump(now);
     
       connection_vec_t changed_connections;
       for (const auto& con_ptr : m_frame_connections)
@@ -115,19 +121,17 @@ namespace tf_connector
         if (now - con_ptr->last_update >= max_duration)
           changed_connections.push_back(con_ptr);
       }
-      update_tfs(changed_connections);
+      update_tfs(changed_connections, now);
     }
     //}
 
     /* update_tfs() method //{ */
 
-    void update_tfs(const connection_vec_t& changed_connections)
+    void update_tfs(const connection_vec_t& changed_connections, const ros::Time& now)
     {
       // if changed_frame_its is empty, update all frames
       if (changed_connections.empty())
         return;
-
-      const ros::Time now = ros::Time::now();
 
       // create and publish an updated TF for each changed frame
       tf2_msgs::TFMessage new_tf_msg;
@@ -139,7 +143,7 @@ namespace tf_connector
         geometry_msgs::TransformStamped new_tf;
         try
         {
-          new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, ros::Time(0));
+          new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, con_ptr->change_time);
         }
         catch (const tf2::TransformException& ex)
         {
@@ -174,9 +178,8 @@ namespace tf_connector
     //}
 
     /* check_timejump() method //{ */
-    void check_timejump()
+    void check_timejump(const ros::Time& now)
     {
-      const ros::Time now = ros::Time::now();
       static ros::Time prev_now = now;
       if (now < prev_now)
       {
