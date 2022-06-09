@@ -235,6 +235,7 @@ namespace tf_connector
       const auto root_frame_ids = pl.loadParam2<std::vector<std::string>>("root_frame_ids");
       const auto equal_frame_ids = pl.loadParam2<std::vector<std::string>>("equal_frame_ids");
       pl.loadParam("ignore_older_messages", m_ignore_older_msgs, false);
+      pl.loadParam("max_update_period", m_max_update_period, ros::Duration(0));
 
       const auto offsets = load_offsets(pl);
 
@@ -279,7 +280,8 @@ namespace tf_connector
 
       //}
 
-      m_tim_tf = nh.createTimer(m_max_update_period, &TFConnector::timer_callback, this);
+      if (m_max_update_period > ros::Duration(0))
+        m_tim_tf = nh.createTimer(m_max_update_period, &TFConnector::timer_callback, this);
 
       ROS_INFO("[%s]: Initialized", m_node_name.c_str());
     }

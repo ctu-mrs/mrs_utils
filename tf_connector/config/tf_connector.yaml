@@ -19,3 +19,6 @@ offsets:
 
 # if true, older messages than the last update of the respective frame connection will be ignored
 ignore_older_messages: false
+
+# if no update of a certain connection happens for this duration, it will be forced
+min_update_period: 0.1 # seconds (set to zero to disable)
