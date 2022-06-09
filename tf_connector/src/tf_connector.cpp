@@ -45,7 +45,8 @@ namespace tf_connector
     {
       std::string root_frame_id;
       std::string equal_frame_id;
-      tf2::Transform offset_tf;
+      tf2::Transform offset_tf_in;
+      tf2::Transform offset_tf_ex;
       bool same_frames;
       ros::Time last_update;
       ros::Time change_time;
@@ -161,7 +162,7 @@ namespace tf_connector
         // apply the offset
         tf2::Transform tf;
         tf2::fromMsg(new_tf.transform, tf);
-        tf = tf * con_ptr->offset_tf;
+        tf = con_ptr->offset_tf_ex * tf * con_ptr->offset_tf_in;
         new_tf.transform = tf2::toMsg(tf);
 
         new_tf_msg.transforms.push_back(new_tf);
@@ -192,10 +193,10 @@ namespace tf_connector
     //}
 
     /* load_offsets() method //{ */
-    std::vector<tf2::Transform> load_offsets(mrs_lib::ParamLoader& pl) const
+    std::vector<tf2::Transform> load_offsets(mrs_lib::ParamLoader& pl, const std::string& name) const
     {
       std::vector<tf2::Transform> ret;
-      const auto offsets_xml = pl.loadParam2<XmlRpc::XmlRpcValue>("offsets");
+      const auto offsets_xml = pl.loadParam2<XmlRpc::XmlRpcValue>(name);
       if (offsets_xml.getType() != XmlRpc::XmlRpcValue::TypeArray)
       {
         ROS_ERROR("[%s]: The 'offsets' parameter doesn't have a type array, cannot load", m_node_name.c_str());
@@ -262,7 +263,8 @@ namespace tf_connector
       pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
       pl.loadParam("max_update_period", m_max_update_period);
 
-      const auto offsets = load_offsets(pl);
+      const auto offsets_in = load_offsets(pl, "offsets/intrinsic");
+      const auto offsets_ex = load_offsets(pl, "offsets/extrinsic");
 
       if (!pl.loadedSuccessfully())
       {
@@ -271,9 +273,9 @@ namespace tf_connector
         return;
       }
 
-      if (root_frame_ids.size() != equal_frame_ids.size()  || root_frame_ids.size() != offsets.size())
+      if (root_frame_ids.size() != equal_frame_ids.size() || root_frame_ids.size() != offsets_in.size() || root_frame_ids.size() != offsets_ex.size())
       {
-        ROS_ERROR("[%s]: Number of root frame ids (%lu) must equal the number of equal frame ids (%lu) and the number of offsets (%lu), ending the node", m_node_name.c_str(), root_frame_ids.size(), equal_frame_ids.size(), offsets.size());
+        ROS_ERROR("[%s]: Number of root frame ids (%lu) must equal the number of equal frame ids (%lu) and the number of offsets (%lu, %lu), ending the node", m_node_name.c_str(), root_frame_ids.size(), equal_frame_ids.size(), offsets_in.size(), offsets_ex.size());
         ros::shutdown();
         return;
       }
@@ -287,7 +289,8 @@ namespace tf_connector
         new_con_ptr->root_frame_id = root_frame_ids.at(it);
         new_con_ptr->equal_frame_id = equal_frame_ids.at(it);
         new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
-        new_con_ptr->offset_tf = offsets.at(it);
+        new_con_ptr->offset_tf_in = offsets_in.at(it);
+        new_con_ptr->offset_tf_ex = offsets_ex.at(it);
         new_con_ptr->last_update = now;
         m_frame_connections.push_back(std::move(new_con_ptr));
       }

@@ -12,10 +12,18 @@ equal_frame_ids:
 
 # these offsets will be applied to the transformation from the connecting frame to each of the root frames
 offsets:
-  [
-    [0.0, 0.0, 0.0, 0.0], # four numbers are interpreted as x,y,z,yaw
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], # seven numbers are interpreted as x,y,z,qx,qy,qz,qw (the last four are a quaternion)
-  ]
+  # these are applied in the root frame (typically fcu frame, hence intrinsic)
+  intrinsic:
+    [
+      [0.0, 0.0, 0.0, 0.0], # four numbers are interpreted as x,y,z,yaw
+      [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], # seven numbers are interpreted as x,y,z,qx,qy,qz,qw (the last four are a quaternion)
+    ]
+  # these are applied in the leaf (equal) frame (typically static frame, hence extrinsic)
+  extrinsic:
+    [
+      [0.0, 0.0, 0.0, 0.0], # four numbers are interpreted as x,y,z,yaw
+      [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], # seven numbers are interpreted as x,y,z,qx,qy,qz,qw (the last four are a quaternion)
+    ]
 
 # if true, older messages than the last update of the respective frame connection will be ignored
 ignore_older_messages: false
