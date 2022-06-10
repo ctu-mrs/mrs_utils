@@ -202,6 +202,44 @@ namespace tf_connector
     }
     //}
 
+    /* parse_offset() method //{ */
+    std::optional<tf2::Transform> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
+    {
+      if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray)
+      {
+        ROS_ERROR("[%s]: The %lu-th member of the 'offsets' array is not an array, skipping", m_node_name.c_str(), it);
+        return std::nullopt;
+      }
+    
+      if (offset.size() == 4)
+      {
+        const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
+        const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[3], Eigen::Vector3d::UnitZ()));
+        const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+        return tf2::Transform(rotation, translation);
+      }
+      else if (offset.size() == 7)
+      {
+        const tf2::Vector3 translation (offset[0], offset[1], offset[2]);
+        // Eigen expects parameters of the constructor to be w, x, y, z
+        const Eigen::Quaterniond q = Eigen::Quaterniond(offset[6], offset[3], offset[4], offset[5]).normalized();
+        if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
+        {
+          ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
+          return std::nullopt;
+        }
+        // tf2 expects parameters of the constructor to be x, y, z, w
+        const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+        return tf2::Transform(rotation, translation);
+      }
+      else
+      {
+        ROS_ERROR("[%s]: The member of the 'offsets' array at index %lu has incorrect size (%d, has to be 4 or 7), skipping", m_node_name.c_str(), it, offset.size());
+        return std::nullopt;
+      }
+    }
+    //}
+
     /* load_offsets() method //{ */
     std::vector<tf2::Transform> load_offsets(mrs_lib::ParamLoader& pl, const std::string& name) const
     {
@@ -215,39 +253,9 @@ namespace tf_connector
     
       for (size_t it = 0; it < offsets_xml.size(); it++)
       {
-        const auto offset = offsets_xml[it];
-        if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray)
-        {
-          ROS_ERROR("[%s]: The %lu-th member of the 'offsets' array is not an array, skipping", m_node_name.c_str(), it);
-          continue;
-        }
-    
-        if (offset.size() == 4)
-        {
-          const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
-          const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[3], Eigen::Vector3d::UnitZ()));
-          const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-          ret.emplace_back(rotation, translation);
-        }
-        else if (offset.size() == 7)
-        {
-          const tf2::Vector3 translation (offset[0], offset[1], offset[2]);
-          // Eigen expects parameters of the constructor to be w, x, y, z
-          const Eigen::Quaterniond q = Eigen::Quaterniond(offset[6], offset[3], offset[4], offset[5]).normalized();
-          if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
-          {
-            ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
-            continue;
-          }
-          // tf2 expects parameters of the constructor to be x, y, z, w
-          const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-          ret.emplace_back(rotation, translation);
-        }
-        else
-        {
-          ROS_ERROR("[%s]: The member of the 'offsets' array at index %lu has incorrect size (%d, has to be 4 or 7), skipping", m_node_name.c_str(), it, offset.size());
-          continue;
-        }
+        const auto parsed = parse_offset(offsets_xml[it], it);
+        if (parsed.has_value())
+          ret.push_back(parsed.value());
       }
     
       return ret;
