@@ -405,18 +405,18 @@ namespace tf_connector
         const std::string& frame_name = el->equal_frame_id;
     
         const std::string group_in = frame_name + "/intrinsic";
-        m_ddynrec->registerVariable(group_in+"/override", &(el->override_in), "if true, overrides the values specified in the config file", false, true, group_in);
-        m_ddynrec->registerVariable(group_in+"/x", &(el->override_in_x), "override value for the intrinsic translation's x component", -100.0, 100.0, group_in);
-        m_ddynrec->registerVariable(group_in+"/y", &(el->override_in_y), "override value for the intrinsic translation's y component", -100.0, 100.0, group_in);
-        m_ddynrec->registerVariable(group_in+"/z", &(el->override_in_z), "override value for the intrinsic translation's z component", -100.0, 100.0, group_in);
-        m_ddynrec->registerVariable(group_in+"/heading", &(el->override_in_heading), "override value for the intrinsic rotations's heading component", -M_PI, M_PI, group_in);
+        m_ddynrec->registerVariable(group_in+"/override", &(el->override_in), "if true, overrides the values specified in the config file", false, true, frame_name);
+        m_ddynrec->registerVariable(group_in+"/x", &(el->override_in_x), "override value for the intrinsic translation's x component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_in+"/y", &(el->override_in_y), "override value for the intrinsic translation's y component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_in+"/z", &(el->override_in_z), "override value for the intrinsic translation's z component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_in+"/heading", &(el->override_in_heading), "override value for the intrinsic rotations's heading component", -M_PI, M_PI, frame_name);
     
         const std::string group_ex = frame_name + "/extrinsic";
-        m_ddynrec->registerVariable(group_ex+"/override", &(el->override_ex), "if true, overrides the values specified in the config file", false, true, group_ex);
-        m_ddynrec->registerVariable(group_ex+"/x", &(el->override_ex_x), "override value for the extrinsic translation's x component", -100.0, 100.0, group_ex);
-        m_ddynrec->registerVariable(group_ex+"/y", &(el->override_ex_y), "override value for the extrinsic translation's y component", -100.0, 100.0, group_ex);
-        m_ddynrec->registerVariable(group_ex+"/z", &(el->override_ex_z), "override value for the extrinsic translation's z component", -100.0, 100.0, group_ex);
-        m_ddynrec->registerVariable(group_ex+"/heading", &(el->override_ex_heading), "override value for the extrinsic rotations's heading component", -M_PI, M_PI, group_ex);
+        m_ddynrec->registerVariable(group_ex+"/override", &(el->override_ex), "if true, overrides the values specified in the config file", false, true, frame_name);
+        m_ddynrec->registerVariable(group_ex+"/x", &(el->override_ex_x), "override value for the extrinsic translation's x component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_ex+"/y", &(el->override_ex_y), "override value for the extrinsic translation's y component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_ex+"/z", &(el->override_ex_z), "override value for the extrinsic translation's z component", -100.0, 100.0, frame_name);
+        m_ddynrec->registerVariable(group_ex+"/heading", &(el->override_ex_heading), "override value for the extrinsic rotations's heading component", -M_PI, M_PI, frame_name);
       }
     }
     //}
