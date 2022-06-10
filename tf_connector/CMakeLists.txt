@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   tf
   nodelet
+  ddynamic_reconfigure
   )
 
 set(LIBRARIES

@@ -9,6 +9,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <nodelet/nodelet.h>
+#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 
 // Msgs
 #include <geometry_msgs/TransformStamped.h>
@@ -52,9 +53,23 @@ namespace tf_connector
     {
       std::string root_frame_id;
       std::string equal_frame_id;
+      bool same_frames;
+
       offset_keyframes_t offsets_in;
       offset_keyframes_t offsets_ex;
-      bool same_frames;
+
+      bool override_in = false;
+      double override_in_x = 0.0;
+      double override_in_y = 0.0;
+      double override_in_z = 0.0;
+      double override_in_heading = 0.0;
+
+      bool override_ex = false;
+      double override_ex_x = 0.0;
+      double override_ex_y = 0.0;
+      double override_ex_z = 0.0;
+      double override_ex_heading = 0.0;
+
       ros::Time last_update;
       ros::Time change_time;
     };
@@ -71,6 +86,7 @@ namespace tf_connector
     ros::Subscriber m_sub_tf;
     ros::Publisher m_pub_tf;
     ros::Timer m_tim_tf;
+    std::unique_ptr<ddynamic_reconfigure::DDynamicReconfigure> m_ddynrec;
 
     ros::Duration m_max_update_period = ros::Duration(0.1);
 
@@ -177,8 +193,12 @@ namespace tf_connector
         new_tf.header.frame_id = m_connecting_frame_id;
 
         // interpolate the offsets
-        const tf2::Transform offset_in = interpolate_keypoints(con_ptr->offsets_in, new_tf.header.stamp);
-        const tf2::Transform offset_ex = interpolate_keypoints(con_ptr->offsets_ex, new_tf.header.stamp);
+        const tf2::Transform offset_in = con_ptr->override_in
+          ? to_tf(con_ptr->override_in_x, con_ptr->override_in_y, con_ptr->override_in_z, con_ptr->override_in_heading)
+          : interpolate_keypoints(con_ptr->offsets_in, new_tf.header.stamp);
+        const tf2::Transform offset_ex = con_ptr->override_ex
+          ? to_tf(con_ptr->override_ex_x, con_ptr->override_ex_y, con_ptr->override_ex_z, con_ptr->override_ex_heading)
+          : interpolate_keypoints(con_ptr->offsets_ex, new_tf.header.stamp);
 
         // apply the offset
         tf2::Transform tf;
@@ -256,6 +276,16 @@ namespace tf_connector
     }
     //}
 
+    /* to_tf() method //{ */
+    tf2::Transform to_tf(const double x, const double y, const double z, const double heading) const
+    {
+      const tf2::Vector3 translation(x, y, z);
+      const Eigen::Quaterniond q(Eigen::AngleAxisd(heading, Eigen::Vector3d::UnitZ()));
+      const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+      return tf2::Transform(rotation, translation);
+    }
+    //}
+
     /* parse_offset() method //{ */
     std::optional<offset_keyframe_t> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
     {
@@ -271,20 +301,16 @@ namespace tf_connector
         case 4:
           {
             const ros::Time stamp(0);
-            const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
-            const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[3], Eigen::Vector3d::UnitZ()));
-            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+            const tf2::Transform tf = to_tf(offset[0], offset[1], offset[2], offset[3]);
+            return offset_keyframe_t{stamp, tf};
           }
 
         // stamp,x,y,z,yaw
         case 5:
           {
             const ros::Time stamp(offset[0]);
-            const tf2::Vector3 translation(offset[1], offset[2], offset[3]);
-            const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[4], Eigen::Vector3d::UnitZ()));
-            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+            const tf2::Transform tf = to_tf(offset[1], offset[2], offset[3], offset[4]);
+            return offset_keyframe_t{stamp, tf};
           }
 
         // x,y,z,qx,qy,qz,qw
@@ -371,6 +397,30 @@ namespace tf_connector
     }
     //}
 
+    /* initialize_ddynrec() method //{ */
+    void initialize_ddynrec()
+    {
+      for (auto& el : m_frame_connections)
+      {
+        const std::string& frame_name = el->equal_frame_id;
+    
+        const std::string group_in = frame_name + "/intrinsic";
+        m_ddynrec->registerVariable(group_in+"/override", &(el->override_in), "if true, overrides the values specified in the config file", false, true, group_in);
+        m_ddynrec->registerVariable(group_in+"/x", &(el->override_in_x), "override value for the intrinsic translation's x component", -100.0, 100.0, group_in);
+        m_ddynrec->registerVariable(group_in+"/y", &(el->override_in_y), "override value for the intrinsic translation's y component", -100.0, 100.0, group_in);
+        m_ddynrec->registerVariable(group_in+"/z", &(el->override_in_z), "override value for the intrinsic translation's z component", -100.0, 100.0, group_in);
+        m_ddynrec->registerVariable(group_in+"/heading", &(el->override_in_heading), "override value for the intrinsic rotations's heading component", -M_PI, M_PI, group_in);
+    
+        const std::string group_ex = frame_name + "/extrinsic";
+        m_ddynrec->registerVariable(group_ex+"/override", &(el->override_ex), "if true, overrides the values specified in the config file", false, true, group_ex);
+        m_ddynrec->registerVariable(group_ex+"/x", &(el->override_ex_x), "override value for the extrinsic translation's x component", -100.0, 100.0, group_ex);
+        m_ddynrec->registerVariable(group_ex+"/y", &(el->override_ex_y), "override value for the extrinsic translation's y component", -100.0, 100.0, group_ex);
+        m_ddynrec->registerVariable(group_ex+"/z", &(el->override_ex_z), "override value for the extrinsic translation's z component", -100.0, 100.0, group_ex);
+        m_ddynrec->registerVariable(group_ex+"/heading", &(el->override_ex_heading), "override value for the extrinsic rotations's heading component", -M_PI, M_PI, group_ex);
+      }
+    }
+    //}
+
     /* onInit() method //{ */
 
     virtual void onInit() override
@@ -425,6 +475,9 @@ namespace tf_connector
       /* publishers //{ */
 
       m_pub_tf = nh.advertise<tf2_msgs::TFMessage>("tf_out", 10);
+      m_ddynrec = std::make_unique<ddynamic_reconfigure::DDynamicReconfigure>(nh);
+      initialize_ddynrec();
+      m_ddynrec->publishServicesTopics();
 
       //}
 
@@ -434,6 +487,7 @@ namespace tf_connector
       m_sub_tf = nh.subscribe("tf_in", 10, &TFConnector::tf_callback, this);
 
       //}
+
 
       if (m_max_update_period > ros::Duration(0))
         m_tim_tf = nh.createTimer(m_max_update_period, &TFConnector::timer_callback, this);
