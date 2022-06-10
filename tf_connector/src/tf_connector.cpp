@@ -117,10 +117,13 @@ namespace tf_connector
       check_timejump(now);
     
       connection_vec_t changed_connections;
-      for (const auto& con_ptr : m_frame_connections)
+      for (auto& con_ptr : m_frame_connections)
       {
         if (now - con_ptr->last_update >= max_duration)
+        {
+          con_ptr->change_time = now;
           changed_connections.push_back(con_ptr);
+        }
       }
       update_tfs(changed_connections, now);
     }
@@ -148,8 +151,15 @@ namespace tf_connector
         }
         catch (const tf2::TransformException& ex)
         {
-          ROS_WARN_THROTTLE(1.0, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(), ex.what());
-          continue;
+          try
+          {
+            new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, ros::Time(0));
+          }
+          catch (const tf2::TransformException& ex)
+          {
+            ROS_WARN_THROTTLE(1.0, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(), ex.what());
+            continue;
+          }
         }
 
         // handle weird edge-cases like static transforms and transforms from-to the same frame
