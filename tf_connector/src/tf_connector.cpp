@@ -41,12 +41,19 @@ namespace tf_connector
     std::string m_node_name;
 
   private:
+    struct offset_keyframe_t
+    {
+      ros::Time start_stamp;
+      tf2::Transform offset;
+    };
+    using offset_keyframes_t = std::vector<offset_keyframe_t>;
+
     struct frame_connection_t
     {
       std::string root_frame_id;
       std::string equal_frame_id;
-      tf2::Transform offset_tf_in;
-      tf2::Transform offset_tf_ex;
+      offset_keyframes_t offsets_in;
+      offset_keyframes_t offsets_ex;
       bool same_frames;
       ros::Time last_update;
       ros::Time change_time;
@@ -169,10 +176,14 @@ namespace tf_connector
         new_tf.child_frame_id = root_frame_id;
         new_tf.header.frame_id = m_connecting_frame_id;
 
+        // interpolate the offsets
+        const tf2::Transform offset_in = interpolate_keypoints(con_ptr->offsets_in, new_tf.header.stamp);
+        const tf2::Transform offset_ex = interpolate_keypoints(con_ptr->offsets_ex, new_tf.header.stamp);
+
         // apply the offset
         tf2::Transform tf;
         tf2::fromMsg(new_tf.transform, tf);
-        tf = con_ptr->offset_tf_ex * tf * con_ptr->offset_tf_in;
+        tf = offset_ex * tf * offset_in;
         new_tf.transform = tf2::toMsg(tf);
 
         new_tf_msg.transforms.push_back(new_tf);
@@ -202,8 +213,51 @@ namespace tf_connector
     }
     //}
 
+    /* interpolate_keypoints() method //{ */
+    tf2::Transform interpolate_keypoints(const offset_keyframes_t& keyframes, const ros::Time& to_time) const
+    {
+      // handle special cases
+      if (keyframes.empty())
+        return tf2::Transform::getIdentity();
+      if (keyframes.size() == 1)
+        return keyframes.front().offset;
+
+      // find keyframe before and after to_time
+      using it_t = offset_keyframes_t::const_iterator;
+      it_t kfr_before = keyframes.begin();
+      it_t kfr_after = keyframes.begin();
+      for (auto it = std::cbegin(keyframes); it != std::cend(keyframes); ++it)
+      {
+        const auto& kfr = *it;
+        if (kfr.start_stamp < to_time)
+        {
+          kfr_before = it;
+          kfr_after = it;
+        }
+        if (kfr.start_stamp > to_time)
+        {
+          kfr_after = it;
+          break;
+        }
+      }
+
+      // handle another special case
+      if (kfr_before->start_stamp == kfr_after->start_stamp)
+        return kfr_before->offset;
+
+      // finally do the interpolation
+      const double coeff = (to_time - kfr_before->start_stamp).toSec()/(kfr_after->start_stamp - kfr_before->start_stamp).toSec();
+      const tf2::Quaternion interp_quat = kfr_before->offset.getRotation().slerp(kfr_after->offset.getRotation(), coeff);
+      const auto& orig_before = kfr_before->offset.getOrigin();
+      const auto& orig_after = kfr_after->offset.getOrigin();
+      const tf2::Vector3 interp_vec = orig_before + coeff*(orig_after - orig_before);
+      const tf2::Transform interp(interp_quat, interp_vec);
+      return interp;
+    }
+    //}
+
     /* parse_offset() method //{ */
-    std::optional<tf2::Transform> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
+    std::optional<offset_keyframe_t> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
     {
       if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray)
       {
@@ -211,39 +265,75 @@ namespace tf_connector
         return std::nullopt;
       }
     
-      if (offset.size() == 4)
+      switch (offset.size())
       {
-        const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
-        const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[3], Eigen::Vector3d::UnitZ()));
-        const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-        return tf2::Transform(rotation, translation);
-      }
-      else if (offset.size() == 7)
-      {
-        const tf2::Vector3 translation (offset[0], offset[1], offset[2]);
-        // Eigen expects parameters of the constructor to be w, x, y, z
-        const Eigen::Quaterniond q = Eigen::Quaterniond(offset[6], offset[3], offset[4], offset[5]).normalized();
-        if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
-        {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
-          return std::nullopt;
-        }
-        // tf2 expects parameters of the constructor to be x, y, z, w
-        const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
-        return tf2::Transform(rotation, translation);
-      }
-      else
-      {
-        ROS_ERROR("[%s]: The member of the 'offsets' array at index %lu has incorrect size (%d, has to be 4 or 7), skipping", m_node_name.c_str(), it, offset.size());
-        return std::nullopt;
+        // x,y,z,yaw
+        case 4:
+          {
+            const ros::Time stamp(0);
+            const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
+            const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[3], Eigen::Vector3d::UnitZ()));
+            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+          }
+
+        // stamp,x,y,z,yaw
+        case 5:
+          {
+            const ros::Time stamp(offset[0]);
+            const tf2::Vector3 translation(offset[1], offset[2], offset[3]);
+            const Eigen::Quaterniond q(Eigen::AngleAxisd(offset[4], Eigen::Vector3d::UnitZ()));
+            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+          }
+
+        // x,y,z,qx,qy,qz,qw
+        case 7:
+          {
+            const ros::Time stamp(0);
+            const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
+            // Eigen expects parameters of the constructor to be w, x, y, z
+            const Eigen::Quaterniond q = Eigen::Quaterniond(offset[6], offset[3], offset[4], offset[5]).normalized();
+            if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
+            {
+              ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
+              return std::nullopt;
+            }
+            // tf2 expects parameters of the constructor to be x, y, z, w
+            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+          }
+
+        // stamp,x,y,z,qx,qy,qz,qw
+        case 8:
+          {
+            const ros::Time stamp(offset[0]);
+            const tf2::Vector3 translation(offset[1], offset[2], offset[3]);
+            // Eigen expects parameters of the constructor to be w, x, y, z
+            const Eigen::Quaterniond q = Eigen::Quaterniond(offset[7], offset[4], offset[5], offset[6]).normalized();
+            if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
+            {
+              ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
+              return std::nullopt;
+            }
+            // tf2 expects parameters of the constructor to be x, y, z, w
+            const tf2::Quaternion rotation(q.x(), q.y(), q.z(), q.w());
+            return offset_keyframe_t{stamp, tf2::Transform(rotation, translation)};
+          }
+
+        default:
+          {
+            ROS_ERROR("[%s]: The member of the 'offsets' array at index %lu has incorrect size (%d, has to be 4 or 7), skipping", m_node_name.c_str(), it, offset.size());
+            return std::nullopt;
+          }
       }
     }
     //}
 
     /* load_offsets() method //{ */
-    std::vector<tf2::Transform> load_offsets(mrs_lib::ParamLoader& pl, const std::string& name) const
+    std::vector<offset_keyframes_t> load_offsets(mrs_lib::ParamLoader& pl, const std::string& name) const
     {
-      std::vector<tf2::Transform> ret;
+      std::vector<offset_keyframes_t> ret;
       const auto offsets_xml = pl.loadParam2<XmlRpc::XmlRpcValue>(name);
       if (offsets_xml.getType() != XmlRpc::XmlRpcValue::TypeArray)
       {
@@ -253,9 +343,28 @@ namespace tf_connector
     
       for (size_t it = 0; it < offsets_xml.size(); it++)
       {
-        const auto parsed = parse_offset(offsets_xml[it], it);
-        if (parsed.has_value())
-          ret.push_back(parsed.value());
+        const auto& member = offsets_xml[it];
+        // first, check if it's another array of arrays - that'd indicate keypoints
+        if (member.getType() == XmlRpc::XmlRpcValue::TypeArray && member.size() > 0 && member[0].getType() == XmlRpc::XmlRpcValue::TypeArray)
+        {
+          offset_keyframes_t keyframes;
+          keyframes.reserve(member.size());
+          for (int el_it = 0; el_it < member.size(); el_it++)
+          {
+            const auto parsed = parse_offset(member[el_it], it);
+            if (parsed.has_value())
+              keyframes.push_back(parsed.value());
+              
+          }
+          ret.push_back(keyframes);
+        }
+        // otherwise it's just a single offset
+        else
+        {
+          const auto parsed = parse_offset(member, it);
+          if (parsed.has_value())
+            ret.push_back({parsed.value()});
+        }
       }
     
       return ret;
@@ -307,8 +416,8 @@ namespace tf_connector
         new_con_ptr->root_frame_id = root_frame_ids.at(it);
         new_con_ptr->equal_frame_id = equal_frame_ids.at(it);
         new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
-        new_con_ptr->offset_tf_in = offsets_in.at(it);
-        new_con_ptr->offset_tf_ex = offsets_ex.at(it);
+        new_con_ptr->offsets_in = offsets_in.at(it);
+        new_con_ptr->offsets_ex = offsets_ex.at(it);
         new_con_ptr->last_update = now;
         m_frame_connections.push_back(std::move(new_con_ptr));
       }
