@@ -15,7 +15,10 @@ offsets:
   # these are applied in the root frame (typically fcu frame, hence intrinsic)
   intrinsic:
     [
-      [0.0, 0.0, 0.0, 0.0], # four numbers are interpreted as x,y,z,yaw
+      [ # if this is another array, it will be interpreted as transformation keyframes that will be interpolated between based on their stamps
+        [1655190099, 10.0, 0.0, 0.0, 0.0], # five numbers are interpreted as stamp,x,y,z,yaw
+        [1655190199.1, 100.0, 0.0, 0.0, 0.0], # five numbers are interpreted as stamp,x,y,z,yaw
+      ],
       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], # seven numbers are interpreted as x,y,z,qx,qy,qz,qw (the last four are a quaternion)
     ]
   # these are applied in the leaf (equal) frame (typically static frame, hence extrinsic)

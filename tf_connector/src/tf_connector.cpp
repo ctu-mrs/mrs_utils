@@ -287,6 +287,16 @@ namespace tf_connector
     //}
 
     /* parse_offset() method //{ */
+    double num(const XmlRpc::XmlRpcValue& xml) const
+    {
+      switch (xml.getType())
+      {
+        case XmlRpc::XmlRpcValue::TypeInt: return (int)xml;
+        case XmlRpc::XmlRpcValue::TypeDouble: return (double)xml;
+        default: return std::numeric_limits<double>::quiet_NaN();
+      }
+    }
+
     std::optional<offset_keyframe_t> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
     {
       if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray)
@@ -301,15 +311,15 @@ namespace tf_connector
         case 4:
           {
             const ros::Time stamp(0);
-            const tf2::Transform tf = to_tf(offset[0], offset[1], offset[2], offset[3]);
+            const tf2::Transform tf = to_tf(num(offset[0]), num(offset[1]), num(offset[2]), num(offset[3]));
             return offset_keyframe_t{stamp, tf};
           }
 
         // stamp,x,y,z,yaw
         case 5:
           {
-            const ros::Time stamp(offset[0]);
-            const tf2::Transform tf = to_tf(offset[1], offset[2], offset[3], offset[4]);
+            const ros::Time stamp(num(num(offset[0])));
+            const tf2::Transform tf = to_tf(num(offset[1]), num(offset[2]), num(offset[3]), num(offset[4]));
             return offset_keyframe_t{stamp, tf};
           }
 
@@ -317,9 +327,9 @@ namespace tf_connector
         case 7:
           {
             const ros::Time stamp(0);
-            const tf2::Vector3 translation(offset[0], offset[1], offset[2]);
+            const tf2::Vector3 translation(num(offset[0]), num(offset[1]), num(offset[2]));
             // Eigen expects parameters of the constructor to be w, x, y, z
-            const Eigen::Quaterniond q = Eigen::Quaterniond(offset[6], offset[3], offset[4], offset[5]).normalized();
+            const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[6]), num(offset[3]), num(offset[4]), num(offset[5])).normalized();
             if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
             {
               ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
@@ -333,10 +343,10 @@ namespace tf_connector
         // stamp,x,y,z,qx,qy,qz,qw
         case 8:
           {
-            const ros::Time stamp(offset[0]);
-            const tf2::Vector3 translation(offset[1], offset[2], offset[3]);
+            const ros::Time stamp(num(offset[0]));
+            const tf2::Vector3 translation(num(offset[1]), num(offset[2]), num(offset[3]));
             // Eigen expects parameters of the constructor to be w, x, y, z
-            const Eigen::Quaterniond q = Eigen::Quaterniond(offset[7], offset[4], offset[5], offset[6]).normalized();
+            const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
             if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
             {
               ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
@@ -380,7 +390,6 @@ namespace tf_connector
             const auto parsed = parse_offset(member[el_it], it);
             if (parsed.has_value())
               keyframes.push_back(parsed.value());
-              
           }
           ret.push_back(keyframes);
         }
@@ -487,7 +496,6 @@ namespace tf_connector
       m_sub_tf = nh.subscribe("tf_in", 10, &TFConnector::tf_callback, this);
 
       //}
-
 
       if (m_max_update_period > ros::Duration(0))
         m_tim_tf = nh.createTimer(m_max_update_period, &TFConnector::timer_callback, this);
