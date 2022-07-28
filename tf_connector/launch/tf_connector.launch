@@ -15,7 +15,7 @@
 
   <node pkg="nodelet" type="nodelet" name="tf_connector" args="$(arg nodelet) tf_connector/TFConnector $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
-    <rosparam file="$(find tf_connector)/config/tf_connector.yaml" />
+    <rosparam unless="$(eval not arg('custom_config') == '')" file="$(find tf_connector)/config/tf_connector_offsets.yaml" />
 
     <!-- Load a user param file -->
     <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />

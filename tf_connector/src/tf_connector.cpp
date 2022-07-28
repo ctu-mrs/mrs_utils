@@ -297,11 +297,11 @@ namespace tf_connector
       }
     }
 
-    std::optional<offset_keyframe_t> parse_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
+    std::optional<offset_keyframe_t> parse_single_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const
     {
       if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray)
       {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of the 'offsets' array is not an array, skipping");
+        ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection is not an array, skipping");
         return std::nullopt;
       }
     
@@ -332,7 +332,7 @@ namespace tf_connector
             const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[6]), num(offset[3]), num(offset[4]), num(offset[5])).normalized();
             if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
             {
-              ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
+              ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
               return std::nullopt;
             }
             // tf2 expects parameters of the constructor to be x, y, z, w
@@ -349,7 +349,7 @@ namespace tf_connector
             const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
             if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all())
             {
-              ROS_ERROR_STREAM("[" << m_node_name << "]: The member of the 'offsets' array at index " << it << " has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
+              ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
               return std::nullopt;
             }
             // tf2 expects parameters of the constructor to be x, y, z, w
@@ -359,15 +359,15 @@ namespace tf_connector
 
         default:
           {
-            ROS_ERROR("[%s]: The member of the 'offsets' array at index %lu has incorrect size (%d, has to be 4, 5, 7 or 8), skipping", m_node_name.c_str(), it, offset.size());
+            ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has incorrect size (" << offset.size() << ", has to be 4, 5, 7 or 8), skipping");
             return std::nullopt;
           }
       }
     }
     //}
 
-    /* load_offsets() method //{ */
-    std::optional<offset_keyframes_t> load_offset(const XmlRpc::XmlRpcValue& offsets_xml, const size_t it) const
+    /* parse_offset_keypoints() method //{ */
+    std::optional<offset_keyframes_t> parse_offset_keypoints(const XmlRpc::XmlRpcValue& offsets_xml, const size_t it) const
     {
       std::optional<offset_keyframes_t> ret;
     
@@ -378,7 +378,7 @@ namespace tf_connector
         keyframes.reserve(offsets_xml.size());
         for (int el_it = 0; el_it < offsets_xml.size(); el_it++)
         {
-          const auto parsed = parse_offset(offsets_xml[el_it], it);
+          const auto parsed = parse_single_offset(offsets_xml[el_it], it);
           if (parsed.has_value())
             keyframes.push_back(parsed.value());
           else
@@ -389,7 +389,7 @@ namespace tf_connector
       // otherwise it's just a single offset
       else
       {
-        const auto parsed = parse_offset(offsets_xml, it);
+        const auto parsed = parse_single_offset(offsets_xml, it);
         if (parsed.has_value())
           ret = {parsed.value()};
         else
@@ -400,80 +400,132 @@ namespace tf_connector
     }
     //}
 
+    /* parse_offsets() method //{ */
+    std::optional<std::pair<offset_keyframes_t, offset_keyframes_t>> parse_offsets(const XmlRpc::XmlRpcValue& offsets_xml, const size_t it) const
+    {
+      std::pair<offset_keyframes_t, offset_keyframes_t> ret;
+    
+      for (auto mem_it = std::cbegin(offsets_xml); mem_it != std::cend(offsets_xml); ++mem_it)
+      {
+        const auto& mem_name = mem_it->first;
+        const auto& mem = mem_it->second;
+        if (mem_name == "intrinsic")
+        {
+          const auto offsets_in_opt = parse_offset_keypoints(offsets_xml["intrinsic"], it);
+          if (!offsets_in_opt.has_value())
+            return std::nullopt;
+          ret.first = offsets_in_opt.value();
+        }
+        else if (mem_name == "extrinsic")
+        {
+          const auto offsets_ex_opt = parse_offset_keypoints(offsets_xml["extrinsic"], it);
+          if (!offsets_ex_opt.has_value())
+            return std::nullopt;
+          ret.second = offsets_ex_opt.value();
+        }
+        else
+        {
+          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "' of 'offsets'. Aborting parse.");
+          return std::nullopt;
+        }
+      }
+    
+      return ret;
+    }
+    //}
+
+    /* parse_connections() method //{ */
     std::optional<connection_vec_t> parse_connections(const XmlRpc::XmlRpcValue& xmlarr) const
     {
-      const static std::string root_frame_id = "root_frame_id";
-      const static std::string equal_frame_id = "equal_frame_id";
+      const static std::string root_frame_xmlname = "root_frame_id";
+      const static std::string equal_frame_xmlname = "equal_frame_id";
+      const static std::string offsets_xmlname = "offsets";
       if (xmlarr.getType() != XmlRpc::XmlRpcValue::TypeArray)
       {
         ROS_ERROR("[%s]: The 'connections' parameter has to be array, but it's not. Cannot parse.", m_node_name.c_str());
         return std::nullopt;
       }
-
+    
       const auto now = ros::Time::now();
       connection_vec_t ret;
       ret.reserve(xmlarr.size());
-
+    
       for (size_t it = 0; it < xmlarr.size(); it++)
       {
-        const auto& member = xmlarr[it];
-        if (member.getType() != XmlRpc::XmlRpcValue::TypeStruct)
+        const auto& conn_xml = xmlarr[it];
+        if (conn_xml.getType() != XmlRpc::XmlRpcValue::TypeStruct)
         {
           ROS_ERROR_STREAM("[" << m_node_name << "]: Invalid type of the " << it << ". member of 'connections'. Cannot parse.");
           return std::nullopt;
         }
-
-        if (!member.hasMember(root_frame_id) || !member.hasMember(equal_frame_id))
+    
+        if (!conn_xml.hasMember(root_frame_xmlname) || !conn_xml.hasMember(equal_frame_xmlname))
         {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' is missing either the '" << root_frame_id << "' or '" << equal_frame_id << "' member. Cannot parse.");
+          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' is missing either the '" << root_frame_xmlname << "' or '" << equal_frame_xmlname << "' member. Cannot parse.");
           return std::nullopt;
         }
-
-        const auto root_frame_id_xml = member[root_frame_id];
-        const auto equal_frame_id_xml = member[equal_frame_id];
-        if (root_frame_id_xml.getType() != XmlRpc::XmlRpcValue::TypeString || equal_frame_id_xml.getType() != XmlRpc::XmlRpcValue::TypeString)
-        {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has a wrong type of either the '" << root_frame_id << "' or '" << equal_frame_id << "' member. Cannot parse.");
-          return std::nullopt;
-        }
-
+    
         auto new_con_ptr = std::make_shared<frame_connection_t>();
-        new_con_ptr->root_frame_id = std::string(root_frame_id_xml);
-        new_con_ptr->equal_frame_id = std::string(equal_frame_id_xml);
-        new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
-        new_con_ptr->last_update = now;
-
-        if (member.hasMember("offsets"))
+        bool parsed_root = false;
+        bool parsed_equal = false;
+    
+        for (auto mem_it = std::cbegin(conn_xml); mem_it != std::cend(conn_xml); ++mem_it)
         {
-          const auto offsets_xml = member["offsets"];
-          if (offsets_xml.getType() != XmlRpc::XmlRpcValue::TypeStruct)
+          const auto& mem_name = mem_it->first;
+          const auto& mem = mem_it->second;
+          // firstly, check types
+          if (
+                 (mem_name == root_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString)
+              || (mem_name == equal_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString)
+              || (mem_name == offsets_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeStruct)
+             )
           {
-            ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has a wrong type of the 'offsets' member. Cannot parse.");
+            ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has a wrong type of the '" << mem_name << "' member. Cannot parse.");
             return std::nullopt;
           }
-
-          if (offsets_xml.hasMember("intrinsic"))
+    
+          if (mem_name == root_frame_xmlname)
           {
-            const auto offsets_in_opt = load_offset(offsets_xml["intrinsic"], it);
-            if (!offsets_in_opt.has_value())
-              return std::nullopt;
-            new_con_ptr->offsets_in = offsets_in_opt.value();
+            new_con_ptr->root_frame_id = std::string(mem);
+            parsed_root = true;
           }
-          
-          if (offsets_xml.hasMember("extrinsic"))
+          else if (mem_name == equal_frame_xmlname)
           {
-            const auto offsets_ex_opt = load_offset(offsets_xml["extrinsic"], it);
-            if (!offsets_ex_opt.has_value())
-              return std::nullopt;
-            new_con_ptr->offsets_ex = offsets_ex_opt.value();
+            new_con_ptr->equal_frame_id = std::string(mem);
+            parsed_equal = true;
           }
+          else if (mem_name == offsets_xmlname)
+          {
+            const auto offsets_opt = parse_offsets(mem, it);
+            if (!offsets_opt.has_value())
+              return std::nullopt;
+            const auto& offsets = offsets_opt.value();
+            new_con_ptr->offsets_in = offsets.first;
+            new_con_ptr->offsets_ex = offsets.second;
+          }
+          else
+          {
+            ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "'. Aborting parse.");
+            return std::nullopt;
+          }
+    
         }
-
+    
+        if (!parsed_root || !parsed_equal)
+        {
+          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' misses a compulsory member '" << root_frame_xmlname << "' or '" << equal_frame_xmlname << "'. Aborting parse.");
+          return std::nullopt;
+        }
+    
+        new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
+        new_con_ptr->last_update = now;
+    
         ret.push_back(new_con_ptr);
       }
-
+    
       return ret;
     }
+    //}
 
     /* initialize_ddynrec() method //{ */
     void initialize_ddynrec()
