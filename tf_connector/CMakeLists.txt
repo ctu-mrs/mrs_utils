@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  message_generation
   mrs_lib
   dynamic_reconfigure
-  tf
+  tf2
+  tf2_ros
   nodelet
   ddynamic_reconfigure
   )
@@ -21,7 +21,7 @@ set(LIBRARIES
 catkin_package(
   LIBRARIES ${LIBRARIES}
   INCLUDE_DIRS
-  CATKIN_DEPENDS roscpp mrs_lib
+  CATKIN_DEPENDS roscpp nodelet mrs_lib dynamic_reconfigure ddynamic_reconfigure tf2 tf2_ros
   )
 
 include_directories(

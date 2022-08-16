@@ -21,7 +21,8 @@
   <depend>tf2_ros</depend>
   <depend>tf2_sensor_msgs</depend>
   <depend>message_runtime</depend>
-  <depend>ddymanic_reconfigure</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>ddynamic_reconfigure</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelets.xml" />
