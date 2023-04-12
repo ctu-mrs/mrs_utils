@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>trajectory_transformer</name>
+  <version>1.0.0</version>
+  <description>A package for transformation of multiple trajectories specified by sequence of waypoints (x, y, z, heading) in a text file.</description>
+
+  <maintainer email="vit.kratky@fel.cvut.cz">Vít Krátký</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>cmake_modules</depend>
+  <depend>rospy</depend>
+
+</package>

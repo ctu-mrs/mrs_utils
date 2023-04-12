@@ -1,0 +1,20 @@
+trajectory_folder_in: "/home/vit/git/uav_modules/ros_packages/trajectory_loader/sample_trajectories"
+# trajectory_folder_in: "/home/vit/transformed_trajectories3"
+trajectory_folder_out: "/home/vit/transformed_trajectories"
+
+process_all: true # if true, all files in the trajectory_folder_in are processed
+
+trajectory_files: ["trajectory1.txt", "trajectory2.txt", "circle_10_5.txt", "eight_8ms.txt"]
+
+trajectory_dt: 0.2 # (s)
+
+transformation:
+  translation: 
+    x: -5.0
+    y: -10.0 
+    z: 0.0
+  rotation:
+    heading: 1.57
+    origin:
+      x: 30.0
+      y: 0.0

@@ -1,0 +1,13 @@
+<launch>
+
+  <!-- args corresponding to environment variables -->
+  <arg name="config" default="" />
+
+  <node name="trajectory_transformer" pkg="trajectory_transformer" type="trajectory_transformer.py" output="screen">
+
+    <rosparam file="$(find trajectory_transformer)/config/trajectory_transformer.yaml" />
+    <rosparam if="$(eval not arg('config') == '')" file="$(arg config)" />
+
+  </node>
+
+</launch>
