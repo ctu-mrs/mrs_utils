@@ -155,7 +155,6 @@ private:
   // listening to the RC channels as told by pixhawk
   int  rc_channel_last_value_         = PWM_MIDDLE;
   bool rc_channel_was_low_            = false;
-  bool rc_channel_was_high_           = false;
   bool rc_channel_values_initialized_ = false;
   int  _rc_channel_                   = 0;
 
@@ -332,13 +331,13 @@ void RcTrajectoryTrackingTrigger::callbackRC(mrs_lib::SubscribeHandler<mavros_ms
       if (rc_channel_was_low_ && channel_high) {
 
         switch_transition_   = TRANSITION_UP;
-        rc_channel_was_high_ = true;
+        rc_channel_was_low_  = false;
         ROS_INFO("[RcTrajectoryTrackingTrigger]: Switch transition set to TRANSITION_UP.");
 
-      } else if (rc_channel_was_high_ && channel_low) {
+      } else if (!rc_channel_was_low_ && channel_low) {
 
-        switch_transition_  = TRANSITION_DOWN;
-        rc_channel_was_low_ = true;
+        switch_transition_   = TRANSITION_DOWN;
+        rc_channel_was_low_  = true;
         ROS_INFO("[RcTrajectoryTrackingTrigger]: Switch transition set to TRANSITION_DOWN.");
       }
     } else {
@@ -642,7 +641,7 @@ void RcTrajectoryTrackingTrigger::checkDistanceToTrajectoryStart() {
 
       if (auto ret = transformer_->transform(temp_ref, tf)) {
 
-        geometry_msgs::Point uav_position = ret.value().reference.position;
+        geometry_msgs::Point uav_position           = ret.value().reference.position;
         geometry_msgs::Point trajectory_first_point = trajectory_reference_.points[0].position;
 
         double dist = sqrt(pow(uav_position.x - trajectory_first_point.x, 2) + pow(uav_position.y - trajectory_first_point.y, 2) +
@@ -665,7 +664,6 @@ void RcTrajectoryTrackingTrigger::checkDistanceToTrajectoryStart() {
     ROS_WARN_THROTTLE(5.0, "[RcTrajectoryTrackingTrigger]: Distance to trajectory start is not known. Odometry: %s, trajectory: %s",
                       got_odometry_ ? "ok" : "missing", got_trajectory_reference_ ? "ok" : "missing");
   }
-
 }
 
 //}
