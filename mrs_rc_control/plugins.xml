@@ -1,0 +1,5 @@
+<library path="lib/libRcTrajectoryTrackingTrigger">
+  <class name="mrs_rc_control/RcTrajectoryTrackingTrigger" type="mrs_rc_control::rc_trajectory_tracking_trigger::RcTrajectoryTrackingTrigger" base_class_type="nodelet::Nodelet">
+    <description>RcTrajectoryTrackingTrigger nodelet</description>
+  </class>
+</library>

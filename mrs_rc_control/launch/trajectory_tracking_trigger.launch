@@ -1,0 +1,43 @@
+<launch>
+
+  <!-- args corresponding to environment variables -->
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME)" />
+
+  <arg name="custom_config" default="" />
+
+    <!-- other args -->
+  <arg name="standalone" default="true" />
+
+  <arg     if="$(arg standalone)" name="nodelet" value="standalone" />
+  <arg unless="$(arg standalone)" name="nodelet" value="load" />
+  <arg     if="$(arg standalone)" name="nodelet_manager" value="" />
+  <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg UAV_NAME)_nodelet_manager" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node name="rc_trajectory_control" pkg="nodelet" type="nodelet" args="$(arg nodelet) mrs_rc_control/RcTrajectoryTrackingTrigger $(arg nodelet_manager)" output="screen">
+
+      <rosparam file="$(find mrs_rc_control)/config/trajectory_tracking_trigger.yaml" />
+
+        <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="uav_name" value="$(arg UAV_NAME)" />
+
+        <!-- Subscribers -->
+      <remap from="~mavros_state_in" to="mavros/state" />
+      <remap from="~odometry_in" to="odometry/odom_main" />
+      <remap from="~trajectory_reference_in" to="control_manager/trajectory_reference" />
+      <remap from="~rc_in" to="mavros/rc/in" />
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+
+      <!-- services -->
+      <remap from="~start_trajectory_tracking_out" to="control_manager/start_trajectory_tracking" />
+      <remap from="~stop_trajectory_tracking_out" to="control_manager/stop_trajectory_tracking" />
+      <remap from="~fly_to_trajectory_start_out" to="control_manager/goto_trajectory_start" />
+
+    </node>
+
+  </group>
+
+</launch>
