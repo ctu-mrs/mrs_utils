@@ -6,3 +6,7 @@ rc:
   channel_number: 6 # the same as RC mode (RC mode has to be switched off) 
 
 service_call_attempts: 10
+
+flight_constraints:
+  type: fast
+  use: true

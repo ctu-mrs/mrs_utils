@@ -35,6 +35,7 @@
       <remap from="~start_trajectory_tracking_out" to="control_manager/start_trajectory_tracking" />
       <remap from="~stop_trajectory_tracking_out" to="control_manager/stop_trajectory_tracking" />
       <remap from="~fly_to_trajectory_start_out" to="control_manager/goto_trajectory_start" />
+      <remap from="~set_constraints_out" to="constraint_manager/set_constraints" />
 
     </node>
 

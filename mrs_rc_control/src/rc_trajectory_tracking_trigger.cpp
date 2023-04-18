@@ -22,6 +22,7 @@
 
 #include <mrs_msgs/ControlManagerDiagnostics.h>
 #include <mrs_msgs/TrajectoryReference.h>
+#include <mrs_msgs/String.h>
 
 #include <geometry_msgs/PoseStamped.h>
 
@@ -33,22 +34,11 @@
 
 /* defines //{ */
 
-#define TAU 2 * M_PI
 #define PWM_MIDDLE 1500
 #define PWM_MIN 1000
 #define PWM_MAX 2000
 #define PWM_DEADBAND 200
 #define PWM_RANGE PWM_MAX - PWM_MIN
-#define REF_X 0
-#define REF_Y 1
-#define REF_Z 2
-#define REF_HEADING 3
-#define ELAND_STR "eland"
-#define EHOVER_STR "ehover"
-#define ESCALATING_FAILSAFE_STR "escalating_failsafe"
-#define FAILSAFE_STR "failsafe"
-#define INPUT_UAV_STATE 0
-#define INPUT_ODOMETRY 1
 
 //}
 
@@ -69,6 +59,7 @@ typedef enum
   STATE_FLYING_NORMALLY,
   STATE_FLYING_TO_TRAJECTORY_START,
   STATE_AT_TRAJECTORY_START,
+  STATE_SETTING_CONSTRAINTS,
   STATE_TRAJECTORY_TRACKING,
   STATE_TRAJECTORY_TRACKING_STOPPED,
   STATE_FINISHED,
@@ -106,6 +97,7 @@ private:
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_fly_to_trajectory_start_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_start_trajectory_tracking_;
   mrs_lib::ServiceClientHandler<std_srvs::Trigger> sch_stop_trajectory_tracking_;
+  mrs_lib::ServiceClientHandler<mrs_msgs::String>  sch_set_constraints_;
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -164,14 +156,18 @@ private:
   double RCChannelToRange(double rc_value, double range, double deadband);
 
   // | ---------------------- other params ---------------------- |
-  int       call_attempt_counter_ = 0;
-  int       _service_call_n_attempts_;
-  ros::Time time_of_last_service_call_;
-  bool      is_flying_normally_ = false;
+  int         call_attempt_counter_ = 0;
+  int         _service_call_n_attempts_;
+  ros::Time   time_of_last_service_call_;
+  bool        is_flying_normally_          = false;
+  bool        _set_constraints_for_flight_ = false;
+  std::string _constraints_for_flight_;
+  bool        constraints_set_ = false;
 
   // | ---------------------- other methods ---------------------- |
   bool callTriggerService(mrs_lib::ServiceClientHandler<std_srvs::Trigger>& sch_trigger);
   void checkDistanceToTrajectoryStart();
+  bool setConstraints(std::string constraints);
 
   // | ---------------------- state machine --------------------- |
 
@@ -204,6 +200,8 @@ void RcTrajectoryTrackingTrigger::onInit() {
   param_loader.loadParam("main_timer_rate", _main_timer_rate_);
   param_loader.loadParam("rc/channel_number", _rc_channel_);
   param_loader.loadParam("service_call_attempts", _service_call_n_attempts_);
+  param_loader.loadParam("flight_constraints/type", _constraints_for_flight_);
+  param_loader.loadParam("flight_constraints/use", _set_constraints_for_flight_);
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[RcTrajectoryTrackingTrigger]: Could not load all parameters!");
@@ -233,6 +231,7 @@ void RcTrajectoryTrackingTrigger::onInit() {
   sch_stop_trajectory_tracking_  = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "stop_trajectory_tracking_out");
   sch_start_trajectory_tracking_ = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "start_trajectory_tracking_out");
   sch_fly_to_trajectory_start_   = mrs_lib::ServiceClientHandler<std_srvs::Trigger>(nh_, "fly_to_trajectory_start_out");
+  sch_set_constraints_           = mrs_lib::ServiceClientHandler<mrs_msgs::String>(nh_, "set_constraints_out");
 
   // | --------------------- tf transformer --------------------- |
 
@@ -330,14 +329,14 @@ void RcTrajectoryTrackingTrigger::callbackRC(mrs_lib::SubscribeHandler<mavros_ms
 
       if (rc_channel_was_low_ && channel_high) {
 
-        switch_transition_   = TRANSITION_UP;
-        rc_channel_was_low_  = false;
+        switch_transition_  = TRANSITION_UP;
+        rc_channel_was_low_ = false;
         ROS_INFO("[RcTrajectoryTrackingTrigger]: Switch transition set to TRANSITION_UP.");
 
       } else if (!rc_channel_was_low_ && channel_low) {
 
-        switch_transition_   = TRANSITION_DOWN;
-        rc_channel_was_low_  = true;
+        switch_transition_  = TRANSITION_DOWN;
+        rc_channel_was_low_ = true;
         ROS_INFO("[RcTrajectoryTrackingTrigger]: Switch transition set to TRANSITION_DOWN.");
       }
     } else {
@@ -448,7 +447,40 @@ void RcTrajectoryTrackingTrigger::timerMain([[maybe_unused]] const ros::TimerEve
 
       ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: Hovering at trajectory start. Waiting for start trajectory tracking service call.");
 
-      if (switch_transition_ == TRANSITION_DOWN) {
+      if (_set_constraints_for_flight_) {
+        changeState(STATE_SETTING_CONSTRAINTS);
+      } else if (switch_transition_ == TRANSITION_DOWN) {
+        changeState(STATE_TRAJECTORY_TRACKING);
+      }
+
+      break;
+    }
+
+    case STATE_SETTING_CONSTRAINTS: {
+
+      ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: Hovering at trajectory start. Waiting for start trajectory tracking service call.");
+
+      if (!constraints_set_) {
+        constraints_set_ = setConstraints(_constraints_for_flight_);
+
+        if (!constraints_set_) {
+
+          if (++call_attempt_counter_ < _service_call_n_attempts_) {
+
+            ROS_WARN("[RcTrajectoryTrackingTrigger]: Failed to call set constraints service.");
+            return;
+
+          } else {
+
+            changeState(STATE_FINISHED);
+            ROS_ERROR("[RcTrajectoryTrackingTrigger]: Failed to call set constraints service for the %dth time, giving up", call_attempt_counter_);
+          }
+        }
+
+        call_attempt_counter_ = 0;
+      }
+
+      if (constraints_set_ && switch_transition_ == TRANSITION_DOWN) {
         changeState(STATE_TRAJECTORY_TRACKING);
       }
 
@@ -539,6 +571,11 @@ void RcTrajectoryTrackingTrigger::changeState(States_t new_state) {
       break;
     }
 
+    case STATE_SETTING_CONSTRAINTS: {
+
+      break;
+    }
+
     case STATE_TRAJECTORY_TRACKING: {
 
       bool res = callTriggerService(sch_start_trajectory_tracking_);
@@ -619,6 +656,15 @@ bool RcTrajectoryTrackingTrigger::callTriggerService(mrs_lib::ServiceClientHandl
 }
 
 //}
+
+bool RcTrajectoryTrackingTrigger::setConstraints(std::string constraints) {
+  mrs_msgs::String string_service;
+  string_service.request.value = constraints;
+  sch_set_constraints_.call(string_service);
+  ROS_INFO("[RcTrajectoryTrackingTrigger]: Set constraints service called with success = %d, %s", string_service.response.success,
+           string_service.response.message.c_str());
+  return string_service.response.success;
+}
 
 /* checkDistanceToTrajectoryStart() //{ */
 
