@@ -399,7 +399,7 @@ void RcTrajectoryTrackingTrigger::timerMain([[maybe_unused]] const ros::TimerEve
 
       ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: Waiting for trajectory to be loaded.");
 
-      if (control_manager_diagnostics.tracker_status.trajectory_length > 0) {
+      if (got_trajectory_reference_) {
         changeState(STATE_TRAJECTORY_LOADED);
       }
 
@@ -424,6 +424,10 @@ void RcTrajectoryTrackingTrigger::timerMain([[maybe_unused]] const ros::TimerEve
       ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: Flying normally. Waiting for fly to trajectory start service call.");
 
       checkDistanceToTrajectoryStart();
+
+      if (control_manager_diagnostics.tracker_status.trajectory_length < 1) {
+        ROS_ERROR_THROTTLE(1.0, "[RcTrajectoryTrackingTrigger]: Trajectory not loaded correctly.");
+      }
 
       if (switch_transition_ == TRANSITION_UP) {
         changeState(STATE_FLYING_TO_TRAJECTORY_START);
