@@ -494,7 +494,7 @@ void RcTrajectoryTrackingTrigger::timerMain([[maybe_unused]] const ros::TimerEve
 
     case STATE_TRAJECTORY_TRACKING: {
 
-      ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: . Waiting for start trajectory tracking service call.");
+      ROS_INFO_THROTTLE(3.0, "[RcTrajectoryTrackingTrigger]: Tracking trajectory.");
       if (switch_transition_ == TRANSITION_UP) {
         changeState(STATE_TRAJECTORY_TRACKING_STOPPED);
       } else if (!control_manager_diagnostics.tracker_status.tracking_trajectory && (ros::Time::now() - time_of_last_service_call_).toSec() > 1.0) {
