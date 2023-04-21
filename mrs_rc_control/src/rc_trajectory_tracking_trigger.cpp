@@ -25,6 +25,7 @@
 #include <mrs_msgs/String.h>
 
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseArray.h>
 
 #include <sensor_msgs/CameraInfo.h>
 
@@ -104,7 +105,7 @@ private:
   mrs_lib::SubscribeHandler<nav_msgs::Odometry>                  sh_odometry_;
   mrs_lib::SubscribeHandler<mavros_msgs::RCIn>                   sh_rc_in_;
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_diagnostics_;
-  mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>       sh_trajectory_reference_;
+  mrs_lib::SubscribeHandler<geometry_msgs::PoseArray>       sh_trajectory_reference_;
 
   // | ----------------------- main timer ----------------------- |
 
@@ -132,9 +133,9 @@ private:
 
   // | --------------- trajectory reference -------------- |
 
-  void                          callbackTrajectoryReference(mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>& wrp);
+  void                          callbackTrajectoryReference(mrs_lib::SubscribeHandler<geometry_msgs::PoseArray>& wrp);
   std::mutex                    mutex_trajectory_reference_;
-  mrs_msgs::TrajectoryReference trajectory_reference_;
+  geometry_msgs::PoseArray trajectory_reference_;
   bool                          got_trajectory_reference_ = false;
 
   // | ---------------------- RC ---------------------- |
@@ -223,7 +224,7 @@ void RcTrajectoryTrackingTrigger::onInit() {
   sh_rc_in_               = mrs_lib::SubscribeHandler<mavros_msgs::RCIn>(shopts, "rc_in", &RcTrajectoryTrackingTrigger::callbackRC, this);
   sh_control_diagnostics_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(
       shopts, "control_manager_diagnostics_in", &RcTrajectoryTrackingTrigger::callbackControlManagerDiagnostics, this);
-  sh_trajectory_reference_ = mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>(shopts, "trajectory_reference_in",
+  sh_trajectory_reference_ = mrs_lib::SubscribeHandler<geometry_msgs::PoseArray>(shopts, "trajectory_reference_in",
                                                                                       &RcTrajectoryTrackingTrigger::callbackTrajectoryReference, this);
 
   // | ---------------- service client handlers ---------------- |
@@ -349,7 +350,7 @@ void RcTrajectoryTrackingTrigger::callbackRC(mrs_lib::SubscribeHandler<mavros_ms
 
 /* callbackTrajectoryReference() //{ */
 
-void RcTrajectoryTrackingTrigger::callbackTrajectoryReference(mrs_lib::SubscribeHandler<mrs_msgs::TrajectoryReference>& wrp) {
+void RcTrajectoryTrackingTrigger::callbackTrajectoryReference(mrs_lib::SubscribeHandler<geometry_msgs::PoseArray>& wrp) {
 
   if (!is_initialized_) {
     return;
@@ -359,7 +360,7 @@ void RcTrajectoryTrackingTrigger::callbackTrajectoryReference(mrs_lib::Subscribe
 
   std::scoped_lock lock(mutex_trajectory_reference_);
 
-  if (wrp.getMsg()->points.size() > 0) {
+  if (wrp.getMsg()->poses.size() > 0) {
 
     trajectory_reference_     = *wrp.getMsg();
     got_trajectory_reference_ = true;
@@ -692,7 +693,7 @@ void RcTrajectoryTrackingTrigger::checkDistanceToTrajectoryStart() {
       if (auto ret = transformer_->transform(temp_ref, tf)) {
 
         geometry_msgs::Point uav_position           = ret.value().reference.position;
-        geometry_msgs::Point trajectory_first_point = trajectory_reference_.points[0].position;
+        geometry_msgs::Point trajectory_first_point = trajectory_reference_.poses[0].position;
 
         double dist = sqrt(pow(uav_position.x - trajectory_first_point.x, 2) + pow(uav_position.y - trajectory_first_point.y, 2) +
                            pow(uav_position.z - trajectory_first_point.z, 2));

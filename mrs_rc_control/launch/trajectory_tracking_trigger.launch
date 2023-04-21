@@ -27,7 +27,7 @@
         <!-- Subscribers -->
       <remap from="~mavros_state_in" to="mavros/state" />
       <remap from="~odometry_in" to="odometry/odom_main" />
-      <remap from="~trajectory_reference_in" to="control_manager/trajectory_reference" />
+      <remap from="~trajectory_reference_in" to="control_manager/mpc_tracker/trajectory_processed/poses" />
       <remap from="~rc_in" to="mavros/rc/in" />
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
 
