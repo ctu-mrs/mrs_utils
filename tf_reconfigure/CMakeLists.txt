@@ -1,16 +1,24 @@
-cmake_minimum_required(VERSION 3.1.2)
+cmake_minimum_required(VERSION 3.5)
 project(tf_reconfigure)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  message_generation
-  mrs_lib
+set(CATKIN_DEPENDENCIES
+  cmake_modules
+  message_runtime
   dynamic_reconfigure
-  tf
+  mrs_lib
   nodelet
+  roscpp
+  sensor_msgs
+  tf2
+  tf2_ros
+  tf2_sensor_msgs
+  )
+
+find_package(catkin REQUIRED COMPONENTS
+  ${CATKIN_DEPENDENCIES}
   )
 
 generate_dynamic_reconfigure_options(
@@ -18,13 +26,13 @@ generate_dynamic_reconfigure_options(
   )
 
 set(LIBRARIES
-  TfReconfigure
+  MrsUtils_TfReconfigure
   )
 
 catkin_package(
   LIBRARIES ${LIBRARIES}
   INCLUDE_DIRS include
-  CATKIN_DEPENDS roscpp mrs_lib
+  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
 include_directories(
@@ -32,16 +40,16 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
-add_library(TfReconfigure
+add_library(MrsUtils_TfReconfigure
   src/TfReconfigure.cpp
   )
 
-add_dependencies(TfReconfigure
+add_dependencies(MrsUtils_TfReconfigure
   ${catkin_EXPORTED_TARGETS}
   ${PROJECT_NAME}_gencfg
   )
 
-target_link_libraries(TfReconfigure
+target_link_libraries(MrsUtils_TfReconfigure
   ${LIBS}
   ${catkin_LIBRARIES}
   )
@@ -57,10 +65,10 @@ install(TARGETS ${LIBRARIES}
   )
 
 install(DIRECTORY launch config rviz start
+  USE_SOURCE_PERMISSIONS
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
-install(DIRECTORY ./
+install(FILES nodelets.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  FILES_MATCHING PATTERN "*.xml"
   )

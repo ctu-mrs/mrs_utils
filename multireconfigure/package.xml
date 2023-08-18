@@ -14,5 +14,6 @@
   <depend>cmake_modules</depend>
   <depend>rospy</depend>
   <depend>message_runtime</depend>
+  <depend>dynamic_reconfigure</depend>
 
 </package>

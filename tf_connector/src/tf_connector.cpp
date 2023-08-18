@@ -15,10 +15,6 @@
 #include <geometry_msgs/TransformStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
 
 // MRS stuff
 #include <mrs_lib/profiler.h>
@@ -31,6 +27,7 @@
 #include <numeric>
 
 //}
+//
 
 namespace tf_connector
 {

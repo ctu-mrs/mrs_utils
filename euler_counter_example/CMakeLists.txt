@@ -1,21 +1,26 @@
-cmake_minimum_required(VERSION 3.1.2)
+cmake_minimum_required(VERSION 3.5)
 project(euler_counter_example)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CATKIN_DEPENDENCIES
+  cmake_modules
+  dynamic_reconfigure
+  message_generation
+  message_runtime
+  mrs_lib
+  nodelet
+  roscpp
+  tf2
+  )
 
 find_package(Eigen3 REQUIRED)
 set(Eigen_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIRS})
 set(Eigen_LIBRARIES ${Eigen_LIBRARIES})
 
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  message_generation
-  mrs_lib
-  dynamic_reconfigure
-  tf
-  nodelet
-  mrs_lib
+  ${CATKIN_DEPENDENCIES}
   )
 
 generate_dynamic_reconfigure_options(
@@ -23,7 +28,7 @@ generate_dynamic_reconfigure_options(
   )
 
 set(LIBRARIES
-  EulerCounterExample
+  MrsUtils_EulerCounterExample
   )
 
 catkin_package(
@@ -37,16 +42,16 @@ include_directories(
   ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
   )
 
-add_library(EulerCounterExample
+add_library(MrsUtils_EulerCounterExample
   src/euler_counter_example.cpp
   )
 
-add_dependencies(EulerCounterExample
+add_dependencies(MrsUtils_EulerCounterExample
   ${catkin_EXPORTED_TARGETS}
   ${PROJECT_NAME}_gencfg
   )
 
-target_link_libraries(EulerCounterExample
+target_link_libraries(MrsUtils_EulerCounterExample
   ${LIBS}
   ${catkin_LIBRARIES}
   )
@@ -70,7 +75,6 @@ install(DIRECTORY launch config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
-install(DIRECTORY ./
+install(FILES nodelets.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  FILES_MATCHING PATTERN "*.xml"
   )

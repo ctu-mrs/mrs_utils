@@ -12,15 +12,13 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>cmake_modules</depend>
-  <depend>roscpp</depend>
-  <depend>sensor_msgs</depend>
-  <depend>nav_msgs</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
   <depend>mrs_lib</depend>
   <depend>nodelet</depend>
+  <depend>roscpp</depend>
   <depend>tf2</depend>
-  <depend>tf2_ros</depend>
-  <depend>tf2_sensor_msgs</depend>
-  <depend>message_runtime</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelets.xml" />

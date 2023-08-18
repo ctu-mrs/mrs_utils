@@ -1,6 +1,9 @@
-name: euler
 root: ./
+name: simulation
 startup_window: node
+socket_name: mrs
+attach: false
+tmux_options: -f /etc/ctu-mrs/tmux.conf
 windows:
   - roscore:
       layout: tiled

@@ -1,42 +1,48 @@
-cmake_minimum_required(VERSION 3.1.2)
+cmake_minimum_required(VERSION 3.5)
 project(tf_connector)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  mrs_lib
+set(CATKIN_DEPENDENCIS
+  cmake_modules
+  ddynamic_reconfigure
   dynamic_reconfigure
+  mrs_lib
+  nodelet
+  roscpp
   tf2
   tf2_ros
-  nodelet
-  ddynamic_reconfigure
+  tf2_sensor_msgs
+  )
+
+find_package(catkin REQUIRED COMPONENTS
+  ${CATKIN_DEPENDENCIS}
   )
 
 set(LIBRARIES
-  TFConnector
+  MrsUtils_TFConnector
   )
 
 catkin_package(
   LIBRARIES ${LIBRARIES}
   INCLUDE_DIRS
-  CATKIN_DEPENDS roscpp nodelet mrs_lib dynamic_reconfigure ddynamic_reconfigure tf2 tf2_ros
+  CATKIN_DEPENDS ${CATKIN_DEPENDENCIS}
   )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
-add_library(TFConnector
+add_library(MrsUtils_TFConnector
   src/tf_connector.cpp
   )
 
-add_dependencies(TFConnector
+add_dependencies(MrsUtils_TFConnector
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(TFConnector
+target_link_libraries(MrsUtils_TFConnector
   ${LIBS}
   ${catkin_LIBRARIES}
   )
@@ -55,7 +61,6 @@ install(DIRECTORY launch config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
-install(DIRECTORY ./
+install(FILES nodelets.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  FILES_MATCHING PATTERN "*.xml"
   )
