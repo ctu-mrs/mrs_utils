@@ -1,12 +1,15 @@
 # MRS utils
+
 ![thumbnail](.fig/mrs_utils.jpg)
 
-| Build status | [![Build Status](https://github.com/ctu-mrs/mrs_utils/workflows/Noetic/badge.svg)](https://github.com/ctu-mrs/mrs_utils/actions) |
-|--------------|----------------------------------------------------------------------------------------------------------------------------------|
+> :warning: **Attention please: This README is outdated.**
+>
+> The MRS UAV System 1.5 is being released and this page needs updating. Please, keep in mind that the information on this page might not be valid.
 
 ## Overview
 
-This repository contains various useful tools for developement and testing. Use along with the [MRS UAV system](https://github.com/ctu-mrs/mrs_uav_system).
+This repository contains various useful tools for developement and testing.
+Use along with the [MRS UAV system](https://github.com/ctu-mrs/mrs_uav_system).
 
 Contains the following packages
 
