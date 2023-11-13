@@ -4,7 +4,7 @@
 
   <node pkg="tf2_ros" type="static_transform_publisher" name="tf_map" args="0 0 0 0 0 0 map dog" />
 
-  <node pkg="nodelet" type="nodelet" name="euler_counter_example" args="standalone euler_counter_example/EulerCounterExample" output="screen">
+  <node pkg="nodelet" type="nodelet" name="euler_counter_example" args="standalone mrs_euler_counter_example/EulerCounterExample" output="screen">
 
         <!-- Publishers -->
     <remap from="~thrust_vec_out" to="~thrust_vec" />

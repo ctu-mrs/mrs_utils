@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <package format="2">
 
-  <name>tf_estimator</name>
+  <name>mrs_tf_estimator</name>
   <version>1.0.0</version>
-  <description>The tf_estimator package</description>
+  <description>The mrs_tf_estimator package</description>
 
   <maintainer email="vrbamato@fel.cvut.cz">Matouš Vrba</maintainer>
 

@@ -8,13 +8,13 @@
 #include <mrs_lib/mutex.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <euler_counter_example/euler_counter_exampleConfig.h>
+#include <mrs_euler_counter_example/mrs_euler_counter_exampleConfig.h>
 
 #include <geometry_msgs/PoseStamped.h>
 
 #include <eigen3/Eigen/Eigen>
 
-namespace euler_counter_example
+namespace mrs_euler_counter_example
 {
 
 /* class EulerCounterExample //{ */
@@ -39,13 +39,13 @@ private:
 
   // | --------------- dynamic reconfigure server --------------- |
 
-  boost::recursive_mutex                                     mutex_drs_;
-  typedef euler_counter_example::euler_counter_exampleConfig DrsParams_t;
-  typedef dynamic_reconfigure::Server<DrsParams_t>           Drs_t;
-  boost::shared_ptr<Drs_t>                                   drs_;
-  void                                                       callbackDrs(euler_counter_example::euler_counter_exampleConfig &params, uint32_t level);
-  DrsParams_t                                                params_;
-  std::mutex                                                 mutex_params_;
+  boost::recursive_mutex                                             mutex_drs_;
+  typedef mrs_euler_counter_example::mrs_euler_counter_exampleConfig DrsParams_t;
+  typedef dynamic_reconfigure::Server<DrsParams_t>                   Drs_t;
+  boost::shared_ptr<Drs_t>                                           drs_;
+  void        callbackDrs(mrs_euler_counter_example::mrs_euler_counter_exampleConfig &params, uint32_t level);
+  DrsParams_t params_;
+  std::mutex  mutex_params_;
 };
 
 //}
@@ -93,7 +93,7 @@ void EulerCounterExample::onInit() {
 
 /* //{ callbackDrs() */
 
-void EulerCounterExample::callbackDrs(euler_counter_example::euler_counter_exampleConfig &params, [[maybe_unused]] uint32_t level) {
+void EulerCounterExample::callbackDrs(mrs_euler_counter_example::mrs_euler_counter_exampleConfig &params, [[maybe_unused]] uint32_t level) {
 
   if (!is_initialized_) {
     return;
@@ -283,7 +283,7 @@ void EulerCounterExample::timerMain([[maybe_unused]] const ros::TimerEvent &even
 
 //}
 
-}  // namespace euler_counter_example
+}  // namespace mrs_euler_counter_example
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(euler_counter_example::EulerCounterExample, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_euler_counter_example::EulerCounterExample, nodelet::Nodelet)

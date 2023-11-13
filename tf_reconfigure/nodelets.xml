@@ -1,5 +1,0 @@
-<library path="lib/libMrsUtils_TfReconfigure">
-  <class name="tf_reconfigure/TfReconfigure" type="tf_reconfigure::TfReconfigure" base_class_type="nodelet::Nodelet">
-    <description>TfReconfigure nodelet</description>
-  </class>
-</library>

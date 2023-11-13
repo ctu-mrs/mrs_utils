@@ -1,0 +1,28 @@
+<launch>
+
+  <arg name="bag_name" default="/home/matous/bag_files/eagle/trajectory_test/_2021-05-26-17-00-58.bag" />
+  <arg name="skip_time_start" default="0" />
+  <arg name="skip_time_end" default="0" />
+
+  <arg name="topic1_name" default="/uav7/drone_client/detection" />
+  <arg name="topic2_name" default="/uav7/odometry/rtk_local_odom" />
+
+  <arg name="common_time_point1" default="1622034060.747095155" />
+  <arg name="common_time_point2" default="1622034067.216992855" />
+
+  <node pkg="mrs_tf_estimator" type="tf_est.py" name="tf_estimator" output="screen" >
+
+    <param name="bag_name" value="$(arg bag_name)" />
+    <param name="skip_time_start" value="$(arg skip_time_start)" />
+    <param name="skip_time_end" value="$(arg skip_time_end)" />
+
+    <param name="topic1_name" value="$(arg topic1_name)" />
+    <param name="topic2_name" value="$(arg topic2_name)" />
+
+    <param name="common_time_point1" value="$(arg common_time_point1)" />
+    <param name="common_time_point2" value="$(arg common_time_point2)" />
+
+
+  </node>
+
+</launch>

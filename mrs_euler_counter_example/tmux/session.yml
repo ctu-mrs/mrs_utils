@@ -12,7 +12,7 @@ windows:
   - node:
       layout: tiled
       panes:
-        - waitForRos; roslaunch euler_counter_example euler_counter_example.launch
+        - waitForRos; roslaunch mrs_euler_counter_example euler_counter_example.launch
   - rviz:
       layout: tiled
       panes:

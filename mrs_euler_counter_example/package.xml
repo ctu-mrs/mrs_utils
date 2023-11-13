@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
 
-  <name>euler_counter_example</name>
+  <name>mrs_euler_counter_example</name>
   <version>1.0.0</version>
   <description>The Euler Counter-Example package</description>
 

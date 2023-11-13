@@ -14,10 +14,10 @@
 
   <depend>cmake_modules</depend>
 
-  <depend>tf_reconfigure</depend>
-  <depend>tf_estimator</depend>
-  <depend>tf_connector</depend>
-  <depend>multireconfigure</depend>
-  <depend>euler_counter_example</depend>
+  <depend>mrs_tf_reconfigure</depend>
+  <depend>mrs_tf_estimator</depend>
+  <depend>mrs_tf_connector</depend>
+  <depend>mrs_multireconfigure</depend>
+  <depend>mrs_euler_counter_example</depend>
 
 </package>

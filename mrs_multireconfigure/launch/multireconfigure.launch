@@ -1,6 +1,6 @@
 <launch>
 
-  <node pkg="multireconfigure" type="multireconfigure.py" name="multireconfigure" output="screen" >
+  <node pkg="mrs_multireconfigure" type="multireconfigure.py" name="multireconfigure" output="screen" >
 
     <rosparam param="dynparam_topics">[
       "/uav1/swarm_control",

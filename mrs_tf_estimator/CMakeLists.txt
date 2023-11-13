@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(tf_estimator)
+project(mrs_tf_estimator)
 
 set(CATKIN_DEPENDENCIES
   cmake_modules

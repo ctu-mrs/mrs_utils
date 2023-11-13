@@ -1,57 +1,55 @@
 cmake_minimum_required(VERSION 3.5)
-project(euler_counter_example)
+project(mrs_tf_reconfigure)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CATKIN_DEPENDENCIES
   cmake_modules
-  dynamic_reconfigure
-  message_generation
   message_runtime
+  dynamic_reconfigure
   mrs_lib
   nodelet
   roscpp
+  sensor_msgs
   tf2
+  tf2_ros
+  tf2_sensor_msgs
   )
-
-find_package(Eigen3 REQUIRED)
-set(Eigen_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIRS})
-set(Eigen_LIBRARIES ${Eigen_LIBRARIES})
 
 find_package(catkin REQUIRED COMPONENTS
   ${CATKIN_DEPENDENCIES}
   )
 
 generate_dynamic_reconfigure_options(
-  config/euler_counter_example.cfg
+  config/tf.cfg
   )
 
 set(LIBRARIES
-  MrsUtils_EulerCounterExample
+  MrsUtils_MRSTFReconfigure
   )
 
 catkin_package(
   LIBRARIES ${LIBRARIES}
-  CATKIN_DEPENDS roscpp mrs_lib
-  DEPENDS Eigen
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
-  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
   )
 
-add_library(MrsUtils_EulerCounterExample
-  src/euler_counter_example.cpp
+add_library(MrsUtils_MRSTFReconfigure
+  src/TfReconfigure.cpp
   )
 
-add_dependencies(MrsUtils_EulerCounterExample
+add_dependencies(MrsUtils_MRSTFReconfigure
   ${catkin_EXPORTED_TARGETS}
   ${PROJECT_NAME}_gencfg
   )
 
-target_link_libraries(MrsUtils_EulerCounterExample
+target_link_libraries(MrsUtils_MRSTFReconfigure
   ${LIBS}
   ${catkin_LIBRARIES}
   )
@@ -66,12 +64,8 @@ install(TARGETS ${LIBRARIES}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
   )
 
-install(DIRECTORY tmux
+install(DIRECTORY launch config rviz start
   USE_SOURCE_PERMISSIONS
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
-
-install(DIRECTORY launch config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 
