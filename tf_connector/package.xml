@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
 
-  <name>tf_connector</name>
+  <name>mrs_tf_connector</name>
   <version>1.0.0</version>
   <description>A package for connecting two transform trees via root frames</description>
 

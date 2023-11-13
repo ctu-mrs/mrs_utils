@@ -13,9 +13,9 @@
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
 
-  <node pkg="nodelet" type="nodelet" name="tf_connector" args="$(arg nodelet) tf_connector/TFConnector $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+  <node pkg="nodelet" type="nodelet" name="tf_connector" args="$(arg nodelet) mrs_tf_connector/TFConnector $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
-    <rosparam unless="$(eval not arg('custom_config') == '')" file="$(find tf_connector)/config/tf_connector_offsets.yaml" />
+    <rosparam unless="$(eval not arg('custom_config') == '')" file="$(find mrs_tf_connector)/config/tf_connector_offsets.yaml" />
 
     <!-- Load a user param file -->
     <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />

@@ -21,7 +21,7 @@ The frame IDs `uav1/gps_origin` and `uav2/gps_origin` are the **equal frame IDs*
 The trees will be connected through a **common frame ID** called `common_origin` (it's name doesn't matter much, just make sure that it doesn't overlap with any existing frame IDs) through transforms from the **root frames**.
 These transforms will be calculated and automatically updated by the *TF connector* so that the **equal frames** always correspond to the same frame.
 
-You can test this by spawning two UAVs in the [MRS simulation](https://github.com/ctu-mrs/mrs_simulation) called UAV1 and UAV2 and running `roslaunch tf_connector tf_connector.launch`.
+You can test this by spawning two UAVs in the [MRS simulation](https://github.com/ctu-mrs/mrs_simulation) called UAV1 and UAV2 and running `roslaunch mrs_tf_connector tf_connector.launch`.
 
 ## Advanced functionality
 

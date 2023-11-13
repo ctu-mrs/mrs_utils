@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(tf_connector)
+project(mrs_tf_connector)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,7 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
   )
 
 set(LIBRARIES
-  MrsUtils_TFConnector
+  MrsUtils_MRSTFConnector
   )
 
 catkin_package(
@@ -34,15 +34,15 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   )
 
-add_library(MrsUtils_TFConnector
+add_library(MrsUtils_MRSTFConnector
   src/tf_connector.cpp
   )
 
-add_dependencies(MrsUtils_TFConnector
+add_dependencies(MrsUtils_MRSTFConnector
   ${catkin_EXPORTED_TARGETS}
   )
 
-target_link_libraries(MrsUtils_TFConnector
+target_link_libraries(MrsUtils_MRSTFConnector
   ${LIBS}
   ${catkin_LIBRARIES}
   )
