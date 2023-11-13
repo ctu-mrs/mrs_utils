@@ -14,11 +14,11 @@
 
 #include <mrs_lib/param_loader.h>
 
-#include <tf_reconfigure/tfConfig.h>
+#include <mrs_tf_reconfigure/tfConfig.h>
 
 #include <mutex>
 
-namespace tf_reconfigure
+namespace mrs_tf_reconfigure
 {
 
 /* class TfReconfigure //{ */
@@ -52,19 +52,19 @@ private:
 
   boost::recursive_mutex mutex_reconfigure_;
 
-  boost::shared_ptr<dynamic_reconfigure::Server<tf_reconfigure::tfConfig>> reconfigure_server_;
+  boost::shared_ptr<dynamic_reconfigure::Server<mrs_tf_reconfigure::tfConfig>> reconfigure_server_;
 
-  ros::Timer      timer_tf_;
+  ros::Timer timer_tf_;
 
   double rate_timer_tf_ = 1.0;
 
   void timerTf(const ros::TimerEvent& event);
-  void callbackReconfigure([[maybe_unused]] tf_reconfigure::tfConfig& config, [[maybe_unused]] uint32_t level);
+  void callbackReconfigure([[maybe_unused]] mrs_tf_reconfigure::tfConfig& config, [[maybe_unused]] uint32_t level);
   void broadcastTransforms();
 
   //}
 };
 
-}  // namespace tf_reconfigure
+}  // namespace mrs_tf_reconfigure
 
 #endif

@@ -1,6 +1,6 @@
 #include <TfReconfigure.h>
 
-namespace tf_reconfigure
+namespace mrs_tf_reconfigure
 {
 
 /* onInit() //{ */
@@ -35,11 +35,11 @@ void TfReconfigure::onInit() {
   // |                     dynamic reconfigure                    |
   // --------------------------------------------------------------
 
-  reconfigure_server_.reset(new dynamic_reconfigure::Server<tf_reconfigure::tfConfig>(mutex_reconfigure_, nh_));
-  dynamic_reconfigure::Server<tf_reconfigure::tfConfig>::CallbackType f = boost::bind(&TfReconfigure::callbackReconfigure, this, _1, _2);
+  reconfigure_server_.reset(new dynamic_reconfigure::Server<mrs_tf_reconfigure::tfConfig>(mutex_reconfigure_, nh_));
+  dynamic_reconfigure::Server<mrs_tf_reconfigure::tfConfig>::CallbackType f = boost::bind(&TfReconfigure::callbackReconfigure, this, _1, _2);
   reconfigure_server_->setCallback(f);
 
-  transformer_ = std::make_unique<mrs_lib::Transformer>("tf_reconfigure");
+  transformer_ = std::make_unique<mrs_lib::Transformer>("mrs_tf_reconfigure");
   transformer_->retryLookupNewest(true);
 
   is_initialized_ = true;
@@ -106,7 +106,7 @@ void TfReconfigure::timerTf(const ros::TimerEvent& event) {
 //}
 
 /* //{ callbackReconfigure() */
-void TfReconfigure::callbackReconfigure([[maybe_unused]] tf_reconfigure::tfConfig& config, [[maybe_unused]] uint32_t level) {
+void TfReconfigure::callbackReconfigure([[maybe_unused]] mrs_tf_reconfigure::tfConfig& config, [[maybe_unused]] uint32_t level) {
 
   if (!is_initialized_) {
     return;
@@ -176,7 +176,7 @@ void TfReconfigure::callbackReconfigure([[maybe_unused]] tf_reconfigure::tfConfi
 }
 //}
 
-}  // namespace tf_reconfigure
+}  // namespace mrs_tf_reconfigure
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(tf_reconfigure::TfReconfigure, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(mrs_tf_reconfigure::TfReconfigure, nodelet::Nodelet)
