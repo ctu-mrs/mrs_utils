@@ -24,7 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
   )
 
 generate_dynamic_reconfigure_options(
-  config/mrs_euler_counter_example.cfg
+  config/euler_counter_example.cfg
   )
 
 set(LIBRARIES
