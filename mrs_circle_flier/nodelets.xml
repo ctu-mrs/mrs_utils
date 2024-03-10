@@ -1,0 +1,5 @@
+<library path="lib/libMrsCircleFlier_CircleFlier">
+  <class name="mrs_circle_flier/CircleFlier" type="mrs_circle_flier::CircleFlier" base_class_type="nodelet::Nodelet">
+    <description>the CircleFlier nodelet</description>
+  </class>
+</library>

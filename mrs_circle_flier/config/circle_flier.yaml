@@ -1,0 +1,25 @@
+publisher:
+  active: true
+  rate: 30 # [Hz]
+  mode: 0 # [0 = topic, 1 = service]
+
+center:
+  frame_id: ""
+  x: 0.0 # [m]
+  y: 0.0 # [m]
+  z: 3.0 # [m]
+
+radius: 5.0 # [m]
+speed: 4.0 # [m/s]
+dt: 0.2 # [s]
+n_points: 50 # [-]
+direction: 1 # [0 = CW, 1 = CCW]
+fly_now: false
+orientation: 0 # horizontal
+cycloid_speed: 2.0 # [m/s]
+
+heading:
+  use_heading: true
+  mode: 2 # [0 = preset, 1 = tangent, 2 = to center]
+  default_heading: 0.0 # [rad]
+  default_heading_rate: 1.0 # [rad/s]

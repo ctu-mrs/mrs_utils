@@ -1,0 +1,23 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(env UAV_NAME)"/>
+  <arg name="custom_config" default="" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node name="circle_flier" pkg="nodelet" type="nodelet" args="standalone mrs_circle_flier/CircleFlier" output="screen" >
+
+      <rosparam file="$(find mrs_circle_flier)/config/circle_flier.yaml" />
+
+      <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="uav_name" value="$(arg UAV_NAME)" />
+
+        <!-- Services -->
+      <remap from="~trajectory_reference_out" to="control_manager/trajectory_reference" />
+
+    </node>
+
+  </group>
+</launch>
