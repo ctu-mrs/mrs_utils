@@ -11,7 +11,7 @@
   <arg unless="$(arg debug)" name="launch_prefix" value=""/>
   <arg     if="$(arg debug)" name="launch_prefix" value="gdb -ex run --args"/>
 
-  <node pkg="nodelet" type="nodelet" name="tf_reconfigure" args="standalone mrs_tf_reconfigure/TfReconfigure" output="screen" launch-prefix="$(arg launch_prefix)" >
+  <node pkg="nodelet" type="nodelet" name="mrs_tf_reconfigure" args="standalone mrs_tf_reconfigure/TfReconfigure" output="screen" launch-prefix="$(arg launch_prefix)" >
 
     <param name="uav_name" type="string" value="$(arg uav_name)" />
     <param name="frame_parent" type="string" value="$(arg frame_parent)" />
