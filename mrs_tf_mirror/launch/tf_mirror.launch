@@ -1,0 +1,17 @@
+<launch>
+
+  <arg name="debug" default="false" />
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav1)" />
+  <arg name="custom_config" default="" />
+
+  <node pkg="nodelet" type="nodelet" name="tf_mirror" args="standalone mrs_tf_mirror/TfMirror" output="screen">
+
+      <rosparam file="$(find mrs_tf_mirror)/config/tf_mirror.yaml" />
+
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="UAV_NAME" value="$(arg UAV_NAME)" />
+
+  </node>
+
+</launch>
