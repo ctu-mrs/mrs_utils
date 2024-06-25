@@ -11,8 +11,6 @@
 #include <mrs_lib/transform_broadcaster.h>
 #include <mrs_lib/subscribe_handler.h>
 
-#include <mrs_uav_managers/estimation_manager/support.h>
-
 #include <nav_msgs/Odometry.h>
 
 #include <tf2_ros/static_transform_broadcaster.h>
