@@ -1,0 +1,5 @@
+<library path="lib/libMrsThrowActivation_Activation">
+  <class name="mrs_throw_activation/ThrowActivation" type="mrs_throw_activation::ThrowActivation" base_class_type="nodelet::Nodelet">
+    <description>MRS Throw Activation</description>
+  </class>
+</library>

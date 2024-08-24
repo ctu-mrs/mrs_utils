@@ -1,0 +1,27 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(env UAV_NAME)"/>
+  <arg name="custom_config" default="" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node name="throw_activation" pkg="nodelet" type="nodelet" args="standalone mrs_throw_activation/ThrowActivation" output="screen" >
+
+      <rosparam file="$(find mrs_throw_activation)/config/throw_activation.yaml" />
+
+      <!-- Load a user param file -->
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+        <!-- Services -->
+      <remap from="~midair_activation_out" to="uav_manager/midair_activation" />
+      <remap from="~arming_out" to="hw_api/arming" />
+
+        <!-- Subscribers -->
+      <remap from="~hw_api_status_in" to="hw_api/status" />
+      <remap from="~uav_state_in" to="estimation_manager/uav_state" />
+      <remap from="~imu_in" to="hw_api/imu" />
+
+    </node>
+
+  </group>
+</launch>
