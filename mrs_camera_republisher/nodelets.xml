@@ -1,0 +1,5 @@
+<library path="lib/libMrsCameraRepublisher_FrameIdChanger">
+  <class name="mrs_camera_republisher/FrameIdChanger" type="mrs_camera_republisher::FrameIdChanger" base_class_type="nodelet::Nodelet">
+    <description>FrameIdChanger nodelet</description>
+  </class>
+</library>

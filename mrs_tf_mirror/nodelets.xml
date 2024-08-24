@@ -1,0 +1,5 @@
+<library path="lib/libMrsTfMirror_TfMirror">
+  <class name="mrs_tf_mirror/TfMirror" type="mrs_tf_mirror::TfMirror" base_class_type="nodelet::Nodelet">
+    <description>TfMirror nodelet</description>
+  </class>
+</library>

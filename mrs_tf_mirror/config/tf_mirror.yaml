@@ -1,0 +1,34 @@
+tfs: [
+  "uav_state_to_tf",
+]
+
+uav_state_to_tf:
+
+  source:
+
+    prepand_uav_name: true
+
+    tf:
+      enabled: false
+
+      from: "fcu"
+      to: "gps_baro_origin"
+
+      poll_rate: 100.0 # [Hz]
+
+    odometry:
+
+      enabled: true
+
+      topic: "estimation_manager/odom_main"
+
+  result:
+
+    invert: false
+
+    static_tf: false
+
+    prepand_uav_name: false
+
+    parent_frame: "world_main"
+    child_frame: "drone"
