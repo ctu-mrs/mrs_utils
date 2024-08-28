@@ -52,6 +52,8 @@ private:
   // | ------------------------- params ------------------------- |
 
   double _acceleration_magnitude_;
+
+  ros::Time time_disarmed_;
 };
 
 //}
@@ -63,6 +65,8 @@ void ThrowActivation::onInit(void) {
   ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
 
   ros::Time::waitForValid();
+
+  time_disarmed_ = ros::Time(0);
 
   mrs_lib::ParamLoader param_loader(nh_, "ThrowActivation");
 
@@ -114,6 +118,10 @@ void ThrowActivation::onInit(void) {
 void ThrowActivation::timerMain([[maybe_unused]] const ros::TimerEvent& event) {
 
   if (!is_initialized_) {
+    return;
+  }
+
+  if ((ros::Time::now() - time_disarmed_).toSec() < 1.0) {
     return;
   }
 
@@ -232,6 +240,9 @@ bool ThrowActivation::activate() {
       ROS_ERROR_STREAM_THROTTLE(1.0, "[ThrowActivation]: service call for midair activation failed: " << srv.response.message);
       return false;
     } else {
+
+      time_disarmed_ = ros::Time::now();
+
       return true;
     }
 
