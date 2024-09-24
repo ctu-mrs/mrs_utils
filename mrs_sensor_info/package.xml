@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>mrs_sensor_info</name>
+  <version>1.0.0</version>
+  <description>The MRS Sensor Info package</description>
+
+  <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>nodelet</depend>
+  <depend>cmake_modules</depend>
+  <depend>message_runtime</depend>
+  <depend>mrs_lib</depend>
+  <depend>mrs_modules_msgs</depend>
+  <depend>roscpp</depend>
+
+  <export>
+    <nodelet plugin="${prefix}/nodelets.xml" />
+  </export>
+
+</package>

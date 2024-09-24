@@ -1,0 +1,30 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav1)" />
+
+  <arg name="name" default="" />
+  <arg name="topic" default="" />
+  <arg name="expected_rate" default="" />
+  <arg name="type" default="" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node pkg="nodelet" type="nodelet" name="tf_mirror" args="standalone mrs_sensor_info/SensorInfo" output="screen">
+
+        <param name="name" value="$(arg name)" />
+        <param name="topic" value="$(arg topic)" />
+        <param name="expected_rate" value="$(arg expected_rate)" />
+
+        <param if="$(eval arg('type') == '' or arg('type') == 'unknown')" name="type" type="int" value="0" />
+        <param if="$(eval arg('type') == 'camera')" name="type" type="int" value="1" />
+        <param if="$(eval arg('type') == 'lidar_1d')" name="type"  type="int" value="2" />
+        <param if="$(eval arg('type') == 'lidar_2d')" name="type"  type="int" value="3" />
+        <param if="$(eval arg('type') == 'lidar_3d')" name="type"  type="int" value="4" />
+
+        <remap from="~sensor_info_out" to="sensor_info" />
+
+    </node>
+
+  </group>
+
+</launch>
