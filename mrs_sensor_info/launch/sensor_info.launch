@@ -9,7 +9,7 @@
 
   <group ns="$(arg UAV_NAME)">
 
-    <node pkg="nodelet" type="nodelet" name="tf_mirror" args="standalone mrs_sensor_info/SensorInfo" output="screen">
+    <node pkg="nodelet" type="nodelet" name="sensor_info_$(arg name)" args="standalone mrs_sensor_info/SensorInfo" output="screen">
 
         <param name="name" value="$(arg name)" />
         <param name="topic" value="$(arg topic)" />
