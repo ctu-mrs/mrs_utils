@@ -20,8 +20,8 @@
   <depend>mrs_tf_estimator</depend>
   <depend>mrs_tf_reconfigure</depend>
 
+  <depend>mrs_lib</depend>
   <depend>mrs_msgs</depend>
   <depend>mrs_modules_msgs</depend>
-  <depend>mrs_lib</depend>
 
 </package>

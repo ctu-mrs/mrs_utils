@@ -16,6 +16,8 @@
   <depend>nodelet</depend>
   <depend>std_msgs</depend>
   <depend>mrs_lib</depend>
+  <depend>mrs_msgs</depend>
+  <depend>mrs_modules_msgs</depend>
   <depend>image_transport</depend>
 
   <export>

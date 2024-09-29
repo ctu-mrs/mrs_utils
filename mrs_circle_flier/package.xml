@@ -15,6 +15,7 @@
   <depend>dynamic_reconfigure</depend>
   <depend>mrs_lib</depend>
   <depend>mrs_msgs</depend>
+  <depend>mrs_modules_msgs</depend>
   <depend>nodelet</depend>
   <depend>roscpp</depend>
 

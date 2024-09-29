@@ -13,5 +13,8 @@
 
   <depend>cmake_modules</depend>
   <depend>rospy</depend>
+  <depend>mrs_lib</depend>
+  <depend>mrs_msgs</depend>
+  <depend>mrs_modules_msgs</depend>
 
 </package>
