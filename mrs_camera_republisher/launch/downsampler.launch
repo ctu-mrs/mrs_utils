@@ -1,0 +1,36 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav)" />
+
+  <arg name="original_topic" default="" />
+  <arg name="new_topic" default="" />
+
+  <arg name="camera_name" default="" />
+
+  <arg name="rate" default="" />
+
+  <arg name="nodelet_manager_name" default="$(optenv nodelet_manager_name)" />
+
+  <arg     if="$(eval arg('nodelet_manager_name') == '')" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('nodelet_manager_name') == '')" name="nodelet" value="load" />
+  <arg     if="$(eval arg('nodelet_manager_name') == '')" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('nodelet_manager_name') == '')" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <!-- camera republisher -->
+    <node pkg="nodelet" type="nodelet" name="downsampler_$(arg camera_name)" args="$(arg nodelet) mrs_camera_republisher/Downsampler $(arg nodelet_manager)" output="screen">
+
+      <param name="rate" value="$(arg rate)" />
+
+      <remap from="~image_in" to="$(arg original_topic)/image_raw" />
+      <remap from="~camera_info_in" to="$(arg original_topic)/camera_info" />
+
+      <remap from="~image_out" to="$(arg new_topic)/image_raw" />
+      <remap from="~camera_info_out" to="$(arg new_topic)/camera_info" />
+
+    </node>
+
+  </group>
+
+</launch>

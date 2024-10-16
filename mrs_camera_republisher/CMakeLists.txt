@@ -17,6 +17,7 @@ set(CATKIN_DEPENDENCIES
 
 set(LIBRARIES
   MrsCameraRepublisher_FrameIdChanger
+  MrsCameraRepublisher_Downsampler
   )
 
 find_package(catkin REQUIRED COMPONENTS
@@ -51,6 +52,21 @@ add_dependencies(MrsCameraRepublisher_FrameIdChanger
   )
 
 target_link_libraries(MrsCameraRepublisher_FrameIdChanger
+  ${catkin_LIBRARIES}
+  )
+
+# Downsampler
+
+add_library(MrsCameraRepublisher_Downsampler
+  src/downsampler.cpp
+  )
+
+add_dependencies(MrsCameraRepublisher_Downsampler
+  ${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  )
+
+target_link_libraries(MrsCameraRepublisher_Downsampler
   ${catkin_LIBRARIES}
   )
 

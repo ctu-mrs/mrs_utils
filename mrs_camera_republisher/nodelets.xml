@@ -3,3 +3,9 @@
     <description>FrameIdChanger nodelet</description>
   </class>
 </library>
+
+<library path="lib/libMrsCameraRepublisher_Downsampler">
+  <class name="mrs_camera_republisher/Downsampler" type="mrs_camera_republisher::Downsampler" base_class_type="nodelet::Nodelet">
+    <description>Downsampler nodelet</description>
+  </class>
+</library>
