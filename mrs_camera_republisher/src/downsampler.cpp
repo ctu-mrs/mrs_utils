@@ -126,6 +126,10 @@ void Downsampler::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
     return;
   }
 
+  if (publisher_image_.getNumSubscribers() == 0) {
+    return;
+  }
+
   if ((ros::Time::now() - last_time_published_image_).toSec() < _dt_) {
     return;
   }
@@ -146,6 +150,10 @@ void Downsampler::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
 void Downsampler::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg) {
 
   if (!is_initialized_) {
+    return;
+  }
+
+  if (ph_camera_info.getNumSubscribers() == 0) {
     return;
   }
 
