@@ -5,9 +5,9 @@
   <arg name="original_topic" default="" />
   <arg name="new_topic" default="" />
 
-  <arg name="camera_name" default="" />
+  <arg name="camera_name" default="cam" />
 
-  <arg name="rate" default="" />
+  <arg name="rate" default="5.0" />
 
   <arg name="nodelet_manager_name" default="$(optenv nodelet_manager_name)" />
 
@@ -18,8 +18,7 @@
 
   <group ns="$(arg UAV_NAME)">
 
-    <!-- camera republisher -->
-    <node pkg="nodelet" type="nodelet" name="downsampler_$(arg camera_name)" args="$(arg nodelet) mrs_camera_republisher/Downsampler $(arg nodelet_manager)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="throttle_$(arg camera_name)" args="$(arg nodelet) mrs_camera_republisher/Throttle $(arg nodelet_manager)" output="screen">
 
       <param name="rate" value="$(arg rate)" />
 

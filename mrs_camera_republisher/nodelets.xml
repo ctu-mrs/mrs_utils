@@ -4,8 +4,8 @@
   </class>
 </library>
 
-<library path="lib/libMrsCameraRepublisher_Downsampler">
-  <class name="mrs_camera_republisher/Downsampler" type="mrs_camera_republisher::Downsampler" base_class_type="nodelet::Nodelet">
-    <description>Downsampler nodelet</description>
+<library path="lib/libMrsCameraRepublisher_Throttle">
+  <class name="mrs_camera_republisher/Throttle" type="mrs_camera_republisher::Throttle" base_class_type="nodelet::Nodelet">
+    <description>Camera Throttle nodelet</description>
   </class>
 </library>

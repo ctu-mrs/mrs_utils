@@ -19,9 +19,9 @@
 namespace mrs_camera_republisher
 {
 
-/* class Downsampler //{ */
+/* class Throttle //{ */
 
-class Downsampler : public nodelet::Nodelet {
+class Throttle : public nodelet::Nodelet {
 
 public:
   virtual void onInit();
@@ -53,30 +53,30 @@ private:
 
 /* onInit() //{ */
 
-void Downsampler::onInit() {
+void Throttle::onInit() {
 
   ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-  ROS_INFO("[Downsampler]: initializing");
+  ROS_INFO("[Throttle]: initializing");
 
   ros::Time::waitForValid();
 
   last_time_published_image_    = ros::Time(0);
   last_time_published_cam_info_ = ros::Time(0);
 
-  mrs_lib::ParamLoader param_loader(nh, "Downsampler");
+  mrs_lib::ParamLoader param_loader(nh, "Throttle");
 
   double rate;
 
   param_loader.loadParam("rate", rate);
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[Downsampler]: failed to load non-optional parameters!");
+    ROS_ERROR("[Throttle]: failed to load non-optional parameters!");
     ros::shutdown();
   }
 
   if (rate < 1e-3) {
-    ROS_ERROR("[Downsampler]: provided rate is too low");
+    ROS_ERROR("[Throttle]: provided rate is too low");
     ros::shutdown();
   }
 
@@ -88,7 +88,7 @@ void Downsampler::onInit() {
 
   // | ----------------------- subscribers ---------------------- |
 
-  subscriber_image_ = it.subscribe("image_in", 1, &Downsampler::callbackImage, this);
+  subscriber_image_ = it.subscribe("image_in", 1, &Throttle::callbackImage, this);
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh;
@@ -99,7 +99,7 @@ void Downsampler::onInit() {
   shopts.queue_size         = 10;
   shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_camera_info_ = mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo>(shopts, "camera_info_in", &Downsampler::callbackCameraInfo, this);
+  sh_camera_info_ = mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo>(shopts, "camera_info_in", &Throttle::callbackCameraInfo, this);
 
   // | ----------------------- publishers ----------------------- |
 
@@ -111,7 +111,7 @@ void Downsampler::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO_ONCE("[Downsampler]: initialized");
+  ROS_INFO_ONCE("[Throttle]: initialized");
 }
 
 //}
@@ -120,7 +120,7 @@ void Downsampler::onInit() {
 
 /* callbackImage() //{ */
 
-void Downsampler::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
+void Throttle::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
 
   if (!is_initialized_) {
     return;
@@ -140,14 +140,14 @@ void Downsampler::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
 
   last_time_published_image_ = ros::Time::now();
 
-  ROS_INFO_ONCE("[Downsampler]: republishing downsampled images");
+  ROS_INFO_ONCE("[Throttle]: republishing throttled images");
 }
 
 //}
 
 /* callbackCameraInfo() //{ */
 
-void Downsampler::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg) {
+void Throttle::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -167,7 +167,7 @@ void Downsampler::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg
 
   last_time_published_cam_info_ = ros::Time::now();
 
-  ROS_INFO_ONCE("[Downsampler]: republishing downsampled camera info");
+  ROS_INFO_ONCE("[Throttle]: republishing throttled camera info");
 }
 
 //}
@@ -175,4 +175,4 @@ void Downsampler::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg
 }  // namespace mrs_camera_republisher
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_camera_republisher::Downsampler, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(mrs_camera_republisher::Throttle, nodelet::Nodelet);

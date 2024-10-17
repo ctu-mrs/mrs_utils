@@ -17,7 +17,7 @@ set(CATKIN_DEPENDENCIES
 
 set(LIBRARIES
   MrsCameraRepublisher_FrameIdChanger
-  MrsCameraRepublisher_Downsampler
+  MrsCameraRepublisher_Throttle
   )
 
 find_package(catkin REQUIRED COMPONENTS
@@ -55,18 +55,18 @@ target_link_libraries(MrsCameraRepublisher_FrameIdChanger
   ${catkin_LIBRARIES}
   )
 
-# Downsampler
+# Throttle
 
-add_library(MrsCameraRepublisher_Downsampler
-  src/downsampler.cpp
+add_library(MrsCameraRepublisher_Throttle
+  src/throttle.cpp
   )
 
-add_dependencies(MrsCameraRepublisher_Downsampler
+add_dependencies(MrsCameraRepublisher_Throttle
   ${catkin_EXPORTED_TARGETS}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   )
 
-target_link_libraries(MrsCameraRepublisher_Downsampler
+target_link_libraries(MrsCameraRepublisher_Throttle
   ${catkin_LIBRARIES}
   )
 
