@@ -31,7 +31,11 @@ private:
 
   ros::NodeHandle nh_;
 
+  std::unique_ptr<image_transport::ImageTransport> it_;
+
   double _dt_;
+
+  std::string _camera_name_;
 
   mrs_lib::PublisherHandler<sensor_msgs::CameraInfo> ph_camera_info;
 
@@ -45,6 +49,13 @@ private:
 
   mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo> sh_camera_info_;
 
+  ros::Timer timer_main_;
+
+  std::atomic<bool> sh_image_on_    = true;
+  std::atomic<bool> sh_cam_info_on_ = true;
+
+  void timerMain(const ros::TimerEvent& event);
+
   ros::Time last_time_published_image_;
   ros::Time last_time_published_cam_info_;
 };
@@ -57,7 +68,7 @@ void Throttle::onInit() {
 
   ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-  ROS_INFO("[Throttle]: initializing");
+  ROS_INFO("[CameraThrottle_%s]: initializing", _camera_name_.c_str());
 
   ros::Time::waitForValid();
 
@@ -69,14 +80,15 @@ void Throttle::onInit() {
   double rate;
 
   param_loader.loadParam("rate", rate);
+  param_loader.loadParam("camera_name", _camera_name_);
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[Throttle]: failed to load non-optional parameters!");
+    ROS_ERROR("[CameraThrottle_%s]: failed to load non-optional parameters!", _camera_name_.c_str());
     ros::shutdown();
   }
 
   if (rate < 1e-3) {
-    ROS_ERROR("[Throttle]: provided rate is too low");
+    ROS_ERROR("[CameraThrottle_%s]: provided rate is too low", _camera_name_.c_str());
     ros::shutdown();
   }
 
@@ -84,11 +96,11 @@ void Throttle::onInit() {
 
   // | --------------------- image transport -------------------- |
 
-  image_transport::ImageTransport it(nh);
+  it_ = std::make_unique<image_transport::ImageTransport>(nh);
 
   // | ----------------------- subscribers ---------------------- |
 
-  subscriber_image_ = it.subscribe("image_in", 1, &Throttle::callbackImage, this);
+  subscriber_image_ = it_->subscribe("image_in", 1, &Throttle::callbackImage, this);
 
   mrs_lib::SubscribeHandlerOptions shopts;
   shopts.nh                 = nh;
@@ -105,13 +117,68 @@ void Throttle::onInit() {
 
   ph_camera_info = mrs_lib::PublisherHandler<sensor_msgs::CameraInfo>(nh, "camera_info_out", 1);
 
-  publisher_image_ = it.advertise("image_out", 1);
+  publisher_image_ = it_->advertise("image_out", 1);
+
+  // | ------------------------- timers ------------------------- |
+
+  timer_main_ = nh_.createTimer(ros::Duration(1.0), &Throttle::timerMain, this);
 
   // | --------------------- finish the init -------------------- |
 
   is_initialized_ = true;
 
-  ROS_INFO_ONCE("[Throttle]: initialized");
+  ROS_INFO_ONCE("[CameraThrottle_%s]: initialized", _camera_name_.c_str());
+}
+
+//}
+
+// | ------------------------- timers ------------------------- |
+
+/* timerMain() //{ */
+
+void Throttle::timerMain([[maybe_unused]] const ros::TimerEvent& event) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (sh_image_on_) {
+
+    if (publisher_image_.getNumSubscribers() == 0) {
+
+      sh_image_on_ = false;
+      subscriber_image_.shutdown();
+      ROS_INFO("[CameraThrottle_%s]: no subscribers on images, shutting down image subscriber", _camera_name_.c_str());
+    }
+
+  } else {
+
+    if (publisher_image_.getNumSubscribers() > 0) {
+
+      sh_image_on_      = true;
+      subscriber_image_ = it_->subscribe("image_in", 1, &Throttle::callbackImage, this);
+      ROS_INFO("[CameraThrottle_%s]: re-enabling image subscriber", _camera_name_.c_str());
+    }
+  }
+
+  if (sh_cam_info_on_) {
+
+    if (ph_camera_info.getNumSubscribers() == 0) {
+
+      sh_cam_info_on_ = false;
+      sh_camera_info_.stop();
+      ROS_INFO("[CameraThrottle_%s]: no subscribers on camera info, shutting down camera info subscriber", _camera_name_.c_str());
+    }
+
+  } else {
+
+    if (ph_camera_info.getNumSubscribers() > 0) {
+
+      sh_cam_info_on_ = true;
+      sh_camera_info_.start();
+      ROS_INFO("[CameraThrottle_%s]: re-enabling camera info subscriber", _camera_name_.c_str());
+    }
+  }
 }
 
 //}
@@ -126,21 +193,15 @@ void Throttle::callbackImage(const sensor_msgs::Image::ConstPtr& msg) {
     return;
   }
 
-  if (publisher_image_.getNumSubscribers() == 0) {
-    return;
-  }
-
   if ((ros::Time::now() - last_time_published_image_).toSec() < _dt_) {
     return;
   }
 
-  sensor_msgs::Image image = *msg;
-
-  publisher_image_.publish(image);
+  publisher_image_.publish(msg);
 
   last_time_published_image_ = ros::Time::now();
 
-  ROS_INFO_ONCE("[Throttle]: republishing throttled images");
+  ROS_INFO_ONCE("[CameraThrottle_%s]: republishing throttled images", _camera_name_.c_str());
 }
 
 //}
@@ -153,21 +214,15 @@ void Throttle::callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg) {
     return;
   }
 
-  if (ph_camera_info.getNumSubscribers() == 0) {
-    return;
-  }
-
   if ((ros::Time::now() - last_time_published_image_).toSec() < _dt_) {
     return;
   }
 
-  sensor_msgs::CameraInfo info = *msg;
-
-  ph_camera_info.publish(info);
+  ph_camera_info.publish(msg);
 
   last_time_published_cam_info_ = ros::Time::now();
 
-  ROS_INFO_ONCE("[Throttle]: republishing throttled camera info");
+  ROS_INFO_ONCE("[CameraThrottle_%s]: republishing throttled camera info", _camera_name_.c_str());
 }
 
 //}

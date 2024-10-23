@@ -22,6 +22,8 @@
 
       <param name="rate" value="$(arg rate)" />
 
+      <param name="camera_name" value="$(arg camera_name)" />
+
       <remap from="~image_in" to="$(arg original_topic)/image_raw" />
       <remap from="~camera_info_in" to="$(arg original_topic)/camera_info" />
 
