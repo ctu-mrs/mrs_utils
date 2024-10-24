@@ -68,8 +68,6 @@ void Throttle::onInit() {
 
   ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-  ROS_INFO("[CameraThrottle_%s]: initializing", _camera_name_.c_str());
-
   ros::Time::waitForValid();
 
   last_time_published_image_    = ros::Time(0);
@@ -86,6 +84,8 @@ void Throttle::onInit() {
     ROS_ERROR("[CameraThrottle_%s]: failed to load non-optional parameters!", _camera_name_.c_str());
     ros::shutdown();
   }
+
+  ROS_INFO("[CameraThrottle_%s]: initializing", _camera_name_.c_str());
 
   if (rate < 1e-3) {
     ROS_ERROR("[CameraThrottle_%s]: provided rate is too low", _camera_name_.c_str());
