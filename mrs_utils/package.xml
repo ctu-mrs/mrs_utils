@@ -1,32 +1,25 @@
 <?xml version="1.0"?>
-<package format="2">
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
 
   <name>mrs_utils</name>
-  <version>1.0.0</version>
-  <description>The MRS Utils metapackage</description>
+
+  <version>2.0.0</version>
+  <description>MRS Utils</description>
 
   <author email="tomas.baca@fel.cvut.cz">Tomas Baca</author>
   <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
 
-  <license>BSD 3-Clause</license>
+  <license>TODO: License declaration</license>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>cmake_modules</depend>
+  <depend>builtin_interfaces</depend>
 
-  <depend>mrs_camera_republisher</depend>
-  <depend>mrs_circle_flier</depend>
-  <depend>mrs_euler_counter_example</depend>
-  <depend>mrs_multireconfigure</depend>
-  <depend>mrs_sensor_info</depend>
-  <depend>mrs_tf_connector</depend>
-  <depend>mrs_tf_estimator</depend>
-  <depend>mrs_tf_mirror</depend>
-  <depend>mrs_tf_reconfigure</depend>
-  <depend>mrs_throw_activation</depend>
+  <depend>mrs_odometry_republisher</depend>
 
-  <depend>mrs_lib</depend>
-  <depend>mrs_msgs</depend>
-  <depend>mrs_modules_msgs</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 
 </package>

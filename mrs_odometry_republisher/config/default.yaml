@@ -1,0 +1,44 @@
+should_replace_child_frame: false
+should_replace_parent_frame: true
+should_replace_time: false
+
+init_heading_to_zero: true
+
+transform:
+
+  do_transform: false
+
+  from_ros: false
+
+  # when from_tf == False, then we use this explicit transform
+  transformation:
+
+    # child to parent
+    # from livox to fcu on x500
+    rotation: [
+      0.8662, 0.0, 0.5005,
+      0.0, -1.0, 0.0,
+      0.5005, 0.0, -0.8662,
+    ]
+
+    # child in parent
+    # livox in fcu
+    translation: [
+      0.5,
+      0.0,
+      -0.5,
+    ]
+
+    # # child to parent
+    # rotation: [
+    #   1.0, 0.0, 0.0,
+    #   0.0, 1.0, 0.0,
+    #   0.0, 0.0, 1.0,
+    # ]
+
+    # # child in parent
+    # translation: [
+    #   0.0,
+    #   0.0,
+    #   0.0,
+    # ]

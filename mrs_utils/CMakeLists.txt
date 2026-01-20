@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.5)
 project(mrs_utils)
 
-find_package(catkin REQUIRED)
+set(DEPENDENCIES
+  ament_cmake
+)
 
-catkin_package()
+foreach(DEP IN LISTS DEPENDENCIES)
+  find_package(${DEP} REQUIRED)
+endforeach()
+
+## --------------------------------------------------------------
+## |                           install                          |
+## --------------------------------------------------------------
+
+ament_package()

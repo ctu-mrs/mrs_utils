@@ -1,0 +1,601 @@
+/* includes //{ */
+
+#include <rclcpp/rclcpp.hpp>
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/convert.h>
+
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance.hpp>
+#include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <std_msgs/msg/string.hpp>
+
+#include <sensor_msgs/msg/imu.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/transform_listener.h>
+
+#include <mrs_lib/param_loader.h>
+#include <mrs_lib/transformer.h>
+#include <mrs_lib/mutex.h>
+#include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/msg_extractor.h>
+#include <mrs_lib/geometry/conversions.h>
+#include <mrs_lib/node.h>
+#include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/publisher_handler.h>
+
+//}
+
+namespace odometry_republisher
+{
+
+/* class OdometryRepublisher //{ */
+
+class OdometryRepublisher : public mrs_lib::Node {
+public:
+  // virtual void onInit();
+  OdometryRepublisher(const rclcpp::NodeOptions &options);
+
+private:
+  bool is_initialized_ = false;
+
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_subs_;
+  rclcpp::CallbackGroup::SharedPtr cbkgrp_sc_;
+
+  void initialize();
+
+  std::string _uav_name_;
+  bool        _velocity_in_body_frame_ = true;
+
+  bool   _init_heading_to_zero_;
+  bool   got_init_pose_ = false;
+  double init_hdg_      = 0;
+
+  bool _should_replace_time_;
+  bool _should_replace_child_frame_;
+  bool _should_replace_parent_frame_;
+
+  bool _should_transform_;
+  bool _should_transform_from_ros_;
+
+  std::string _tf_parent_;
+  std::string _tf_child_;
+
+  std::string _new_child_frame_;
+  std::string _new_parent_frame_;
+
+  Eigen::MatrixXd     _transform_R_;
+  std::vector<double> _transform_x_;
+
+  geometry_msgs::msg::TransformStamped transform;
+
+  // | -------------------- the transformer  -------------------- |
+
+  std::shared_ptr<mrs_lib::Transformer> transformer_;
+
+  bool                                                     validateOdometry(const nav_msgs::msg::Odometry &odometry);
+  geometry_msgs::msg::PoseWithCovariance::_covariance_type transformCovariance(const geometry_msgs::msg::PoseWithCovariance::_covariance_type &cov_in,
+                                                                               const tf2::Transform                                           &transform);
+
+  // | ----------------------- subscribers ---------------------- |
+
+  mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry> sh_odometry_;
+  void                                                callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
+
+  // | ----------------------- publishers ----------------------- |
+
+  mrs_lib::PublisherHandler<nav_msgs::msg::Odometry> ph_odometry_;
+  rclcpp::Time                                       publisher_odom_last_published_;
+
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srvs_calibrate_;
+  bool                                               compensate_initial_tilt_;
+  bool calibrateSrvCallback(const std::shared_ptr<std_srvs::srv::SetBool::Request> req, std::shared_ptr<std_srvs::srv::SetBool::Response> res);
+  bool is_calibrated_  = false;
+  bool has_valid_odom_ = false;
+  nav_msgs::msg::Odometry odom_init_;
+  std::mutex              mtx_odom_init_;
+
+  Eigen::Matrix3d Exp(const Eigen::Vector3d &ang);
+  Eigen::Matrix3d skewSymmetricMatrix(const Eigen::Vector3d &vec);
+};
+
+//}
+
+/* OdometryRepublisher() //{ */
+
+OdometryRepublisher::OdometryRepublisher(const rclcpp::NodeOptions &options) : mrs_lib::Node("OdometryRepublisher", options) {
+  initialize();
+}
+
+//}
+
+/* initialize() //{ */
+
+void OdometryRepublisher::initialize() {
+
+  node_  = this_node_ptr();
+  clock_ = node_->get_clock();
+
+  cbkgrp_subs_ = this_node().create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbkgrp_sc_   = this_node().create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  RCLCPP_INFO(node_->get_logger(), "[%s]: Initializing", node_->get_name());
+
+  publisher_odom_last_published_ = clock_->now();
+
+  // | ---------- loading ros parameters using mrs_lib ---------- |
+
+  RCLCPP_INFO(node_->get_logger(), "[%s]: loading parameters using ParamLoader", node_->get_name());
+
+  mrs_lib::ParamLoader param_loader(node_, node_->get_name());
+
+  std::string custom_config_path;
+  param_loader.loadParam("custom_config", custom_config_path);
+
+  if (custom_config_path != "") {
+    RCLCPP_INFO(node_->get_logger(), "loading custom config '%s", custom_config_path.c_str());
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  param_loader.addYamlFileFromParam("config");
+
+  param_loader.loadParam("should_replace_child_frame", _should_replace_child_frame_);
+  param_loader.loadParam("should_replace_parent_frame", _should_replace_parent_frame_);
+  param_loader.loadParam("should_replace_time", _should_replace_time_);
+
+  param_loader.loadParam("new_child_frame", _new_child_frame_);
+  param_loader.loadParam("new_parent_frame", _new_parent_frame_);
+
+  param_loader.loadParam("init_heading_to_zero", _init_heading_to_zero_);
+
+  param_loader.loadParam("transform/do_transform", _should_transform_);
+  param_loader.loadParam("transform/from_ros", _should_transform_from_ros_);
+
+  param_loader.loadParam("tf_parent", _tf_parent_);
+  param_loader.loadParam("tf_child", _tf_child_);
+
+  param_loader.loadMatrixKnown("transform/transformation/rotation", _transform_R_, 3, 3);
+  param_loader.loadParam("transform/transformation/translation", _transform_x_);
+
+  if (!param_loader.loadedSuccessfully()) {
+    RCLCPP_ERROR(node_->get_logger(), "[%s]: parameter loading failure", node_->get_name());
+    rclcpp::shutdown();
+  }
+
+  // | --------------------- tf transformer --------------------- |
+
+  transformer_ = std::make_shared<mrs_lib::Transformer>(node_);
+  transformer_->retryLookupNewest(true);
+
+  // | ----------------------- subscribers ---------------------- |
+
+  mrs_lib::SubscriberHandlerOptions shopts;
+  shopts.node                                = this_node_ptr();
+  shopts.no_message_timeout                  = mrs_lib::no_timeout;
+  shopts.threadsafe                          = true;
+  shopts.autostart                           = true;
+  shopts.subscription_options.callback_group = cbkgrp_subs_;
+
+  sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_in", &OdometryRepublisher::callbackOdometry, this);
+
+  // | ----------------------- publishers ----------------------- |
+
+  ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "~/odom_out");
+
+  is_initialized_ = true;
+}
+//}
+
+/* callbackOdometry() //{ */
+
+void OdometryRepublisher::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (!validateOdometry(*msg)) {
+    RCLCPP_ERROR(node_->get_logger(), "input odometry is not numerically valid");
+    return;
+  }
+
+  nav_msgs::msg::Odometry odom_transformed;
+
+  odom_transformed.header = msg->header;
+
+  if (_should_replace_parent_frame_) {
+    odom_transformed.header.frame_id = _new_parent_frame_;
+  }
+
+  if (_should_replace_child_frame_) {
+    odom_transformed.child_frame_id = _new_child_frame_;
+  }
+
+  if (_should_replace_time_) {
+    odom_transformed.header.stamp = rclcpp::Time(clock_->now());
+  }
+
+  /* transform pose with covariance */ /*//{*/
+  geometry_msgs::msg::Pose pose_transformed;
+
+  geometry_msgs::msg::TransformStamped tf_from_ros;
+
+  if (_should_transform_) {
+
+    if (_should_transform_from_ros_) {
+
+      auto tf = transformer_->getTransform(_tf_parent_, _tf_child_, msg->header.stamp);
+
+      if (!tf) {
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "not publishing, could not find transform %s -> %s", _tf_parent_.c_str(), _tf_child_.c_str());
+        return;
+      }
+
+      tf_from_ros = tf.value();
+    }
+  }
+
+  // our newly applied transform
+  Eigen::Matrix3d R_IMU_FCU;
+
+  if (_should_transform_) {
+
+    if (_should_transform_from_ros_) {
+
+      R_IMU_FCU = mrs_lib::AttitudeConverter(tf_from_ros.transform.rotation);
+
+    } else {
+
+      R_IMU_FCU = mrs_lib::AttitudeConverter(_transform_R_);
+    }
+
+  } else {
+    R_IMU_FCU = Eigen::Matrix3d::Identity();
+  }
+
+  // odometrie's child to parent orientation
+  Eigen::Matrix3d R_GLOBAL_IMU = mrs_lib::AttitudeConverter(msg->pose.pose.orientation);
+
+  // R^GLOBAL_FCU = R^GLOBAL_IMU * R^IMU_FCU
+  pose_transformed.orientation = mrs_lib::AttitudeConverter(R_GLOBAL_IMU * R_IMU_FCU);
+
+  // t^IMU_FCU
+  Eigen::Vector3d t_IMU_FCU;
+
+  if (_should_transform_) {
+
+    if (_should_transform_from_ros_) {
+
+      t_IMU_FCU << tf_from_ros.transform.translation.x, tf_from_ros.transform.translation.y, tf_from_ros.transform.translation.z;
+      t_IMU_FCU = R_IMU_FCU*(-t_IMU_FCU);
+
+    } else {
+
+      t_IMU_FCU << _transform_x_.at(0), _transform_x_.at(1), _transform_x_.at(2);
+    }
+
+  } else {
+    t_IMU_FCU << 0, 0, 0;
+  }
+
+  // t^GLOBAL_FCU = R^GLOBAL_IMU * t^IMU_FCU + t^GLOBAL_IMU
+  Eigen::Vector3d translation = R_GLOBAL_IMU * R_IMU_FCU * -(t_IMU_FCU);
+  pose_transformed.position.x = translation(0) + msg->pose.pose.position.x;
+  pose_transformed.position.y = translation(1) + msg->pose.pose.position.y;
+  pose_transformed.position.z = translation(2) + msg->pose.pose.position.z;
+
+  // pose_transformed is now T^GLOBAL_FCU
+
+  // save initial pose to subtract it from all messages to compensate initialized orientation ambiguity
+  geometry_msgs::msg::TransformStamped tf_msg;
+
+  if (_init_heading_to_zero_) {
+
+    if (!got_init_pose_) {
+      init_hdg_ = mrs_lib::AttitudeConverter(pose_transformed.orientation).getHeading();
+      RCLCPP_INFO(node_->get_logger(), "init hdg: %.2f", init_hdg_);
+      got_init_pose_ = true;
+    }
+
+    // T^MRS_GLOBAL
+    tf_msg.header.stamp            = msg->header.stamp;
+    tf_msg.header.frame_id         = odom_transformed.header.frame_id;
+    tf_msg.child_frame_id          = msg->header.frame_id;
+    tf_msg.transform.translation.x = 0;
+    tf_msg.transform.translation.y = 0;
+    tf_msg.transform.translation.z = 0;
+    tf_msg.transform.rotation      = mrs_lib::AttitudeConverter(0, 0, 0).setHeading(-init_hdg_);
+
+    // obtain T^MRS_FCU
+    tf2::doTransform(pose_transformed, pose_transformed, tf_msg);
+
+    // transform covariance
+    // pose covariance is in world frame coordinates (in GLOBAL frame)
+    // TODO is the orientation covariance also in world frame?
+
+    // obtain transformed covariance as R^MRS_GLOBAL * covariance * (R^MRS_GLOBAL)^T where covariance is each 3x3 block of the 6x6 covariance matrix
+    /* tf2::Stamped<tf2::Transform> tf; */
+    tf2::Transform tf;
+    tf2::fromMsg(tf_msg.transform, tf);
+
+    odom_transformed.pose.covariance = transformCovariance(msg->pose.covariance, tf);
+
+  } else {
+    odom_transformed.pose.covariance = msg->pose.covariance;
+  }
+
+  // publish the initial offset to TF - T^GLOBAL_MRS
+  geometry_msgs::msg::TransformStamped tf_msg_inv;
+  tf_msg_inv.header.stamp            = msg->header.stamp;
+  tf_msg_inv.header.frame_id         = msg->header.frame_id;
+  tf_msg_inv.child_frame_id          = odom_transformed.header.frame_id;
+  tf_msg_inv.transform.translation.x = 0;
+  tf_msg_inv.transform.translation.y = 0;
+  tf_msg_inv.transform.translation.z = 0;
+  tf_msg_inv.transform.rotation      = mrs_lib::AttitudeConverter(0, 0, 0).setHeading(init_hdg_);
+
+  odom_transformed.pose.pose = pose_transformed;
+
+  /*//}*/
+
+  /* transform velocity - linear and angular */ /*//{*/
+  geometry_msgs::msg::Vector3 linear_velocity  = msg->twist.twist.linear;
+  geometry_msgs::msg::Vector3 angular_velocity = msg->twist.twist.angular;
+
+  if (_velocity_in_body_frame_) {
+    // if in body frame - rotate from IMU frame to FCU frame
+    Eigen::Vector3d v2;
+    v2 << linear_velocity.x, linear_velocity.y, linear_velocity.z;
+    v2                = R_IMU_FCU.transpose() * v2;
+    linear_velocity.x = v2(0);
+    linear_velocity.y = v2(1);
+    linear_velocity.z = v2(2);
+
+    Eigen::Vector3d v3;
+    v3 << angular_velocity.x, angular_velocity.y, angular_velocity.z;
+    v3                 = R_IMU_FCU.transpose() * v3;
+    angular_velocity.x = v3(0);
+    angular_velocity.y = v3(1);
+    angular_velocity.z = v3(2);
+
+  } else {
+    /* if (_init_in_zero_) { */
+    // if in global frame, apply initial TF offset
+    /* tf2::doTransform(linear_velocity, linear_velocity, tf_msg); */
+    /* tf2::doTransform(angular_velocity, angular_velocity, tf_msg); */
+    /* } */
+
+    // if in global frame - rotate from GLOBAL frame to FCU frame
+    // R^GLOBAL_FCU = R^GLOBAL_IMU * R^IMU_FCU
+    Eigen::Matrix3d R_GLOBAL_FCU = mrs_lib::AttitudeConverter(R_GLOBAL_IMU * R_IMU_FCU);
+    Eigen::Vector3d v2;
+    v2 << linear_velocity.x, linear_velocity.y, linear_velocity.z;
+    v2                = R_GLOBAL_FCU.transpose() * v2;
+    linear_velocity.x = v2(0);
+    linear_velocity.y = v2(1);
+    linear_velocity.z = v2(2);
+
+    Eigen::Vector3d v3;
+    v3 << angular_velocity.x, angular_velocity.y, angular_velocity.z;
+    v3                 = R_GLOBAL_FCU.transpose() * v3;
+    angular_velocity.x = v3(0);
+    angular_velocity.y = v3(1);
+    angular_velocity.z = v3(2);
+  }
+
+  odom_transformed.twist.twist.linear  = linear_velocity;
+  odom_transformed.twist.twist.angular = angular_velocity;
+
+  /*//}*/
+
+  // validate
+  if (!validateOdometry(odom_transformed)) {
+    RCLCPP_ERROR(node_->get_logger(), "transformed odometry is not numerically valid");
+    return;
+  }
+
+  ph_odometry_.publish(odom_transformed);
+  publisher_odom_last_published_ = clock_->now();
+
+  std::stringstream ss_pos;
+  ss_pos << std::fixed << std::setprecision(2) << "VINS: X: " << odom_transformed.pose.pose.position.x << " Y: " << odom_transformed.pose.pose.position.y
+         << " Z: " << odom_transformed.pose.pose.position.z;
+}
+
+//}
+
+/* skewSymmetricMatrix() //{ */
+
+// taken from https://github.com/ros/geometry2/blob/noetic-devel/tf2_geometry_msgs/include/tf2_geometry_msgs/tf2_geometry_msgs.h
+// copied here, so that it's clear what it does right away
+geometry_msgs::msg::PoseWithCovariance::_covariance_type OdometryRepublisher::transformCovariance(
+    const geometry_msgs::msg::PoseWithCovariance::_covariance_type &cov_in, const tf2::Transform &transform) {
+  /**
+   * To transform a covariance matrix:
+   *
+   * [R 0] COVARIANCE [R' 0 ]
+   * [0 R]            [0  R']
+   *
+   * Where:
+   * 	R is the rotation matrix (3x3).
+   * 	R' is the transpose of the rotation matrix.
+   * 	COVARIANCE is the 6x6 covariance matrix to be transformed.
+   */
+
+  // get rotation matrix transpose
+  const tf2::Matrix3x3 R_transpose = transform.getBasis().transpose();
+
+  // convert the covariance matrix into four 3x3 blocks
+  const tf2::Matrix3x3 cov_11(cov_in[0], cov_in[1], cov_in[2], cov_in[6], cov_in[7], cov_in[8], cov_in[12], cov_in[13], cov_in[14]);
+  const tf2::Matrix3x3 cov_12(cov_in[3], cov_in[4], cov_in[5], cov_in[9], cov_in[10], cov_in[11], cov_in[15], cov_in[16], cov_in[17]);
+  const tf2::Matrix3x3 cov_21(cov_in[18], cov_in[19], cov_in[20], cov_in[24], cov_in[25], cov_in[26], cov_in[30], cov_in[31], cov_in[32]);
+  const tf2::Matrix3x3 cov_22(cov_in[21], cov_in[22], cov_in[23], cov_in[27], cov_in[28], cov_in[29], cov_in[33], cov_in[34], cov_in[35]);
+
+  // perform blockwise matrix multiplication
+  const tf2::Matrix3x3 result_11 = transform.getBasis() * cov_11 * R_transpose;
+  const tf2::Matrix3x3 result_12 = transform.getBasis() * cov_12 * R_transpose;
+  const tf2::Matrix3x3 result_21 = transform.getBasis() * cov_21 * R_transpose;
+  const tf2::Matrix3x3 result_22 = transform.getBasis() * cov_22 * R_transpose;
+
+  // form the output
+  geometry_msgs::msg::PoseWithCovariance::_covariance_type output;
+  output[0]  = result_11[0][0];
+  output[1]  = result_11[0][1];
+  output[2]  = result_11[0][2];
+  output[6]  = result_11[1][0];
+  output[7]  = result_11[1][1];
+  output[8]  = result_11[1][2];
+  output[12] = result_11[2][0];
+  output[13] = result_11[2][1];
+  output[14] = result_11[2][2];
+
+  output[3]  = result_12[0][0];
+  output[4]  = result_12[0][1];
+  output[5]  = result_12[0][2];
+  output[9]  = result_12[1][0];
+  output[10] = result_12[1][1];
+  output[11] = result_12[1][2];
+  output[15] = result_12[2][0];
+  output[16] = result_12[2][1];
+  output[17] = result_12[2][2];
+
+  output[18] = result_21[0][0];
+  output[19] = result_21[0][1];
+  output[20] = result_21[0][2];
+  output[24] = result_21[1][0];
+  output[25] = result_21[1][1];
+  output[26] = result_21[1][2];
+  output[30] = result_21[2][0];
+  output[31] = result_21[2][1];
+  output[32] = result_21[2][2];
+
+  output[21] = result_22[0][0];
+  output[22] = result_22[0][1];
+  output[23] = result_22[0][2];
+  output[27] = result_22[1][0];
+  output[28] = result_22[1][1];
+  output[29] = result_22[1][2];
+  output[33] = result_22[2][0];
+  output[34] = result_22[2][1];
+  output[35] = result_22[2][2];
+
+  return output;
+}
+
+//}
+
+/* Exp() //{ */
+
+Eigen::Matrix3d OdometryRepublisher::Exp(const Eigen::Vector3d &ang) {
+
+  const double ang_norm = ang.norm();
+
+  if (ang_norm < 0.0000001) {
+    return Eigen::Matrix3d::Identity();
+  } else {
+    const Eigen::Vector3d rot_axis = ang / ang_norm;
+    const Eigen::Matrix3d m_skew   = skewSymmetricMatrix(rot_axis);
+    return Eigen::Matrix3d::Identity() + std::sin(ang_norm) * m_skew + (1.0 - std::cos(ang_norm)) * m_skew * m_skew;
+  }
+}
+
+//}
+
+/* skewSymmetricMatrix() //{ */
+
+Eigen::Matrix3d OdometryRepublisher::skewSymmetricMatrix(const Eigen::Vector3d &vec) {
+
+  Eigen::Matrix3d m_skew;
+  m_skew << 0.0, vec(2), -vec(1), -vec(2), 0.0, vec(0), vec(1), -vec(0), 0.0;
+  return m_skew;
+}
+
+//}
+
+/* validateOdometry() //{ */
+
+bool OdometryRepublisher::validateOdometry(const nav_msgs::msg::Odometry &odometry) {
+
+  // check position
+
+  if (!std::isfinite(odometry.pose.pose.position.x)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.position.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.pose.pose.position.y)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.position.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.pose.pose.position.z)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.position.z'!!!");
+    return false;
+  }
+
+  // check orientation
+
+  if (!std::isfinite(odometry.pose.pose.orientation.x)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.orientation.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.pose.pose.orientation.y)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.orientation.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.pose.pose.orientation.z)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.orientation.z'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.pose.pose.orientation.w)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.pose.pose.orientation.w'!!!");
+    return false;
+  }
+
+  // check if the quaternion is sound
+
+  if (fabs(Eigen::Vector4d(odometry.pose.pose.orientation.x, odometry.pose.pose.orientation.y, odometry.pose.pose.orientation.z,
+                           odometry.pose.pose.orientation.w)
+               .norm() -
+           1.0) > 1e-2) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "orientation is not sound!!!");
+    return false;
+  }
+
+  // check velocity
+
+  if (!std::isfinite(odometry.twist.twist.linear.x)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.twist.twist.linear.x'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.twist.twist.linear.y)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.twist.twist.linear.y'!!!");
+    return false;
+  }
+
+  if (!std::isfinite(odometry.twist.twist.linear.z)) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "NaN detected in variable 'odometry.twist.twist.linear.z'!!!");
+    return false;
+  }
+
+  return true;
+}
+
+//}
+
+}  // namespace odometry_republisher
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(odometry_republisher::OdometryRepublisher)
