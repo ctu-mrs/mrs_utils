@@ -183,12 +183,20 @@ void OdometryRepublisher::initialize() {
   shopts.threadsafe                          = true;
   shopts.autostart                           = true;
   shopts.subscription_options.callback_group = cbkgrp_subs_;
+  shopts.qos                                 = rclcpp::SensorDataQoS();
 
   sh_odometry_ = mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, "~/odometry_in", &OdometryRepublisher::callbackOdometry, this);
 
   // | ----------------------- publishers ----------------------- |
 
-  ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(node_, "~/odom_out");
+  mrs_lib::PublisherHandlerOptions phopts;
+
+  phopts.node = node_;
+  phopts.qos  = rclcpp::SensorDataQoS();
+
+  ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(phopts, "~/odom_out");
+
+  RCLCPP_INFO(node_->get_logger(), "initialized");
 
   is_initialized_ = true;
 }
@@ -275,7 +283,7 @@ void OdometryRepublisher::callbackOdometry(const nav_msgs::msg::Odometry::ConstS
     if (_should_transform_from_ros_) {
 
       t_IMU_FCU << tf_from_ros.transform.translation.x, tf_from_ros.transform.translation.y, tf_from_ros.transform.translation.z;
-      t_IMU_FCU = R_IMU_FCU*(-t_IMU_FCU);
+      t_IMU_FCU = R_IMU_FCU * (-t_IMU_FCU);
 
     } else {
 
@@ -403,6 +411,20 @@ void OdometryRepublisher::callbackOdometry(const nav_msgs::msg::Odometry::ConstS
   }
 
   ph_odometry_.publish(odom_transformed);
+
+  double heading_out = 0;
+
+  try {
+    heading_out = mrs_lib::AttitudeConverter(odom_transformed.pose.pose.orientation).getHeading();
+  }
+  catch (...) {
+    RCLCPP_ERROR_THROTTLE(node_->get_logger(), *clock_, 1000, "failed to get heading from output odometry");
+  }
+
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "republishing: pos [%.2f %.2f %.2f], vel [%.2f %.2f %.2f], hdg %.2f",
+                       odom_transformed.pose.pose.position.x, odom_transformed.pose.pose.position.y, odom_transformed.pose.pose.position.z,
+                       odom_transformed.twist.twist.linear.x, odom_transformed.twist.twist.linear.y, odom_transformed.twist.twist.linear.z, heading_out);
+
   publisher_odom_last_published_ = clock_->now();
 
   std::stringstream ss_pos;
