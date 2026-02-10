@@ -1,25 +1,25 @@
 /* includes //{ */
 
 // ROS
-#include <ros/ros.h>
-#include <ros/package.h>
+#include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
-#include <tf2_eigen/tf2_eigen.h>
+#include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2/LinearMath/Transform.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <nodelet/nodelet.h>
-#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 // Msgs
-#include <geometry_msgs/TransformStamped.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 // MRS stuff
 #include <mrs_lib/profiler.h>
 #include <mrs_lib/param_loader.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/publisher_handler.h>
+#include <mrs_lib/dynparam_mgr.h>
+#include <mrs_lib/node.h>
 
 // std
 #include <string>
@@ -32,15 +32,16 @@
 namespace mrs_tf_connector
 {
 
-class TFConnector : public nodelet::Nodelet {
+class TFConnector : public mrs_lib::Node {
 public:
-  TFConnector() : m_node_name("TFConnector"){};
-  std::string m_node_name;
+  TFConnector(const rclcpp::NodeOptions& options) : mrs_lib::Node("TFConnector", options) {
+    onInit();
+  }
 
 private:
   struct offset_keyframe_t
   {
-    ros::Time      start_stamp;
+    rclcpp::Time      start_stamp;
     tf2::Transform offset;
   };
   using offset_keyframes_t = std::vector<offset_keyframe_t>;
@@ -66,8 +67,8 @@ private:
     double override_ex_z       = 0.0;
     double override_ex_heading = 0.0;
 
-    ros::Time last_update;
-    ros::Time change_time;
+    rclcpp::Time last_update;
+    rclcpp::Time change_time;
   };
 
   std::mutex  m_mtx;
@@ -79,24 +80,29 @@ private:
   tf2_ros::Buffer                             m_tf_buffer;
   std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
 
-  ros::Subscriber                                            m_sub_tf;
-  ros::Publisher                                             m_pub_tf;
-  ros::Timer                                                 m_tim_tf;
-  std::unique_ptr<ddynamic_reconfigure::DDynamicReconfigure> m_ddynrec;
+  mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage> m_sub_tf;
+  mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>  m_pub_tf;
+  rclcpp::TimerBase::SharedPtr                         m_tim_tf;
+  std::shared_ptr<mrs_lib::DynparamMgr>                m_ddynrec;
 
-  ros::Duration m_max_update_period = ros::Duration(0.1);
+  std::mutex                            mutex_drs_params_;
+  //DynParams_t                           drs_params_;
+
+  rclcpp::Node::SharedPtr      node_;
+  rclcpp::Clock::SharedPtr     clock_;
+  double m_max_update_period = 0.1;
 
 public:
   /* tf_callback() method //{ */
 
-  void tf_callback(tf2_msgs::TFMessageConstPtr msg_ptr) {
+  void tf_callback(tf2_msgs::msg::TFMessage::ConstPtr msg_ptr) {
     std::scoped_lock lck(m_mtx);
-    const ros::Time  now = ros::Time::now();
+    const rclcpp::Time  now = clock_->now();
     check_timejump(now);
 
-    const tf2_msgs::TFMessage& tf_msg = *msg_ptr;
+    const tf2_msgs::msg::TFMessage& tf_msg = *msg_ptr;
     connection_vec_t           changed_connections;
-    for (const geometry_msgs::TransformStamped& tf : tf_msg.transforms) {
+    for (const geometry_msgs::msg::TransformStamped& tf : tf_msg.transforms) {
       // check whether this frame id is of interest
       for (auto& con_ptr : m_frame_connections) {
         // skip connections that have the same equal and root frame
@@ -123,10 +129,10 @@ public:
   //}
 
   /* timer_callback() method //{ */
-  void timer_callback([[maybe_unused]] const ros::TimerEvent&) {
+  void timer_callback() {
     std::scoped_lock    lck(m_mtx);
-    const ros::Time     now = ros::Time::now();
-    const ros::Duration max_duration(0.99 * m_max_update_period.toSec());
+    const rclcpp::Time     now = clock_->now();
+    const rclcpp::Duration max_duration(rclcpp::Duration::from_seconds(0.99 * m_max_update_period));
     check_timejump(now);
 
     connection_vec_t changed_connections;
@@ -142,34 +148,34 @@ public:
 
   /* update_tfs() method //{ */
 
-  void update_tfs(const connection_vec_t& changed_connections, const ros::Time& now) {
+  void update_tfs(const connection_vec_t& changed_connections, const rclcpp::Time& now) {
     // if changed_frame_its is empty, update all frames
     if (changed_connections.empty())
       return;
 
     // create and publish an updated TF for each changed frame
-    tf2_msgs::TFMessage new_tf_msg;
+    tf2_msgs::msg::TFMessage new_tf_msg;
     new_tf_msg.transforms.reserve(changed_connections.size());
     for (const auto& con_ptr : changed_connections) {
       const auto&                     root_frame_id  = con_ptr->root_frame_id;
       const auto&                     equal_frame_id = con_ptr->equal_frame_id;
-      geometry_msgs::TransformStamped new_tf;
+      geometry_msgs::msg::TransformStamped new_tf;
       try {
         new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, con_ptr->change_time);
       }
       catch (const tf2::TransformException& ex) {
         try {
-          new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, ros::Time(0));
+          new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0));
         }
         catch (const tf2::TransformException& ex) {
-          ROS_WARN_THROTTLE(1.0, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(),
+          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(),
                             ex.what());
           continue;
         }
       }
 
       // handle weird edge-cases like static transforms and transforms from-to the same frame
-      if (new_tf.header.stamp == ros::Time(0) || new_tf.child_frame_id == new_tf.header.frame_id)
+      if (rclcpp::Time(new_tf.header.stamp) == rclcpp::Time(0) || new_tf.child_frame_id == new_tf.header.frame_id)
         new_tf.header.stamp = now;
 
       new_tf.child_frame_id  = root_frame_id;
@@ -194,7 +200,7 @@ public:
     }
 
     if (!new_tf_msg.transforms.empty()) {
-      ROS_INFO_THROTTLE(1.0, "[TFConnector]: Publishing updated transform connection.");
+      RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "Publishing updated transform connection.");
       m_pub_tf.publish(new_tf_msg);
     }
   }
@@ -202,10 +208,10 @@ public:
   //}
 
   /* check_timejump() method //{ */
-  void check_timejump(const ros::Time& now) {
-    static ros::Time prev_now = now;
+  void check_timejump(const rclcpp::Time& now) {
+    static rclcpp::Time prev_now = now;
     if (now < prev_now) {
-      ROS_WARN_THROTTLE(1.0, "[%s]: Detected a jump in time, resetting.", m_node_name.c_str());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Detected a jump in time, resetting.");
       for (auto& con_ptr : m_frame_connections)
         con_ptr->last_update = now;
     }
@@ -214,7 +220,7 @@ public:
   //}
 
   /* interpolate_keypoints() method //{ */
-  tf2::Transform interpolate_keypoints(const offset_keyframes_t& keyframes, const ros::Time& to_time) const {
+  tf2::Transform interpolate_keypoints(const offset_keyframes_t& keyframes, const rclcpp::Time& to_time) const {
     // handle special cases
     if (keyframes.empty())
       return tf2::Transform::getIdentity();
@@ -242,7 +248,7 @@ public:
       return kfr_before->offset;
 
     // finally do the interpolation
-    const double          coeff       = (to_time - kfr_before->start_stamp).toSec() / (kfr_after->start_stamp - kfr_before->start_stamp).toSec();
+    const double          coeff       = (to_time - kfr_before->start_stamp).seconds() / (kfr_after->start_stamp - kfr_before->start_stamp).seconds();
     const tf2::Quaternion interp_quat = kfr_before->offset.getRotation().slerp(kfr_after->offset.getRotation(), coeff);
     const auto&           orig_before = kfr_before->offset.getOrigin();
     const auto&           orig_after  = kfr_after->offset.getOrigin();
@@ -275,33 +281,33 @@ public:
 
   std::optional<offset_keyframe_t> parse_single_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const {
     if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray) {
-      ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection is not an array, skipping");
+      RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection is not an array, skipping");
       return std::nullopt;
     }
 
     switch (offset.size()) {
       // x,y,z,yaw
       case 4: {
-        const ros::Time      stamp(0);
+        const rclcpp::Time      stamp(0);
         const tf2::Transform tf = to_tf(num(offset[0]), num(offset[1]), num(offset[2]), num(offset[3]));
         return offset_keyframe_t{stamp, tf};
       }
 
       // stamp,x,y,z,yaw
       case 5: {
-        const ros::Time      stamp(num(num(offset[0])));
+        const rclcpp::Time      stamp(num(num(offset[0])));
         const tf2::Transform tf = to_tf(num(offset[1]), num(offset[2]), num(offset[3]), num(offset[4]));
         return offset_keyframe_t{stamp, tf};
       }
 
       // x,y,z,qx,qy,qz,qw
       case 7: {
-        const ros::Time    stamp(0);
+        const rclcpp::Time    stamp(0);
         const tf2::Vector3 translation(num(offset[0]), num(offset[1]), num(offset[2]));
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[6]), num(offset[3]), num(offset[4]), num(offset[5])).normalized();
         if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all()) {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
                                << "), skipping");
           return std::nullopt;
         }
@@ -312,12 +318,12 @@ public:
 
       // stamp,x,y,z,qx,qy,qz,qw
       case 8: {
-        const ros::Time    stamp(num(offset[0]));
+        const rclcpp::Time    stamp(num(offset[0]));
         const tf2::Vector3 translation(num(offset[1]), num(offset[2]), num(offset[3]));
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
         if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all()) {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
                                << "), skipping");
           return std::nullopt;
         }
@@ -327,7 +333,7 @@ public:
       }
 
       default: {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: An offset of the " << it << ". connection has incorrect size (" << offset.size()
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has incorrect size (" << offset.size()
                              << ", has to be 4, 5, 7 or 8), skipping");
         return std::nullopt;
       }
@@ -383,7 +389,7 @@ public:
           return std::nullopt;
         ret.second = offsets_ex_opt.value();
       } else {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has an unexpected member '" << mem_name
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has an unexpected member '" << mem_name
                              << "' of 'offsets'. Aborting parse.");
         return std::nullopt;
       }
@@ -399,23 +405,23 @@ public:
     const static std::string equal_frame_xmlname = "equal_frame_id";
     const static std::string offsets_xmlname     = "offsets";
     if (xmlarr.getType() != XmlRpc::XmlRpcValue::TypeArray) {
-      ROS_ERROR("[%s]: The 'connections' parameter has to be array, but it's not. Cannot parse.", m_node_name.c_str());
+      RCLCPP_ERROR(node_->get_logger(), "The 'connections' parameter has to be array, but it's not. Cannot parse.");
       return std::nullopt;
     }
 
-    const auto       now = ros::Time::now();
+    const auto       now = clock_->now();
     connection_vec_t ret;
     ret.reserve(xmlarr.size());
 
     for (size_t it = 0; it < xmlarr.size(); it++) {
       const auto& conn_xml = xmlarr[it];
       if (conn_xml.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: Invalid type of the " << it << ". member of 'connections'. Cannot parse.");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "Invalid type of the " << it << ". member of 'connections'. Cannot parse.");
         return std::nullopt;
       }
 
       if (!conn_xml.hasMember(root_frame_xmlname) || !conn_xml.hasMember(equal_frame_xmlname)) {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' is missing either the '" << root_frame_xmlname << "' or '"
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' is missing either the '" << root_frame_xmlname << "' or '"
                              << equal_frame_xmlname << "' member. Cannot parse.");
         return std::nullopt;
       }
@@ -431,7 +437,7 @@ public:
         if ((mem_name == root_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString) ||
             (mem_name == equal_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString) ||
             (mem_name == offsets_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeStruct)) {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has a wrong type of the '" << mem_name
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has a wrong type of the '" << mem_name
                                << "' member. Cannot parse.");
           return std::nullopt;
         }
@@ -450,13 +456,13 @@ public:
           new_con_ptr->offsets_in = offsets.first;
           new_con_ptr->offsets_ex = offsets.second;
         } else {
-          ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "'. Aborting parse.");
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "'. Aborting parse.");
           return std::nullopt;
         }
       }
 
       if (!parsed_root || !parsed_equal) {
-        ROS_ERROR_STREAM("[" << m_node_name << "]: The " << it << ". member of 'connections' misses a compulsory member '" << root_frame_xmlname << "' or '"
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' misses a compulsory member '" << root_frame_xmlname << "' or '"
                              << equal_frame_xmlname << "'. Aborting parse.");
         return std::nullopt;
       }
@@ -505,15 +511,27 @@ public:
 
   /* onInit() method //{ */
 
-  virtual void onInit() override {
-    ROS_INFO("[%s]: Initializing", m_node_name.c_str());
-    ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
-    ros::Time::waitForValid();
+  void onInit() {
+    RCLCPP_INFO(node_->get_logger(), "Initializing");
+    node_ = this->this_node_ptr();
+    clock_ = node_->get_clock();
 
     /* load parameters //{ */
 
-    ROS_INFO("[%s]: LOADING STATIC PARAMETERS", m_node_name.c_str());
-    mrs_lib::ParamLoader pl(nh, m_node_name);
+    RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
+    mrs_lib::ParamLoader pl(node_);
+    pl.addYamlFileFromParam("public_config");
+
+    // load custom config
+    std::string custom_config_path;
+
+    pl.loadParam("custom_config", custom_config_path);
+
+    if (custom_config_path != "")
+    {
+      RCLCPP_INFO(node_->get_logger(), "loading custom config '%s", custom_config_path.c_str());
+      pl.addYamlFile(custom_config_path);
+    }
 
     pl.loadParam("connecting_frame_id", m_connecting_frame_id);
     pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
@@ -522,9 +540,9 @@ public:
     const auto conns_opt = parse_connections(conns_xml);
 
     if (!pl.loadedSuccessfully() || !conns_opt.has_value()) {
-      ROS_ERROR("[%s]: Some compulsory parameters were not loaded or parsed successfully, ending the node", m_node_name.c_str());
-      ros::shutdown();
-      return;
+      RCLCPP_ERROR(node_->get_logger(), "Some compulsory parameters were not loaded or parsed successfully, ending the node");
+      rclcpp::shutdown();
+      exit(1);
     }
 
     m_frame_connections = conns_opt.value();
@@ -533,24 +551,32 @@ public:
 
     /* publishers //{ */
 
-    m_pub_tf  = nh.advertise<tf2_msgs::TFMessage>("tf_out", 10);
-    m_ddynrec = std::make_unique<ddynamic_reconfigure::DDynamicReconfigure>(nh);
+    mrs_lib::PublisherHandlerOptions phopts;
+    phopts.node = node_;
+
+    m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "tf_out");
+
+    m_ddynrec = std::make_shared<mrs_lib::DynparamMgr>(node_, mutex_drs_params_);
+    m_ddynrec->get_param_provider().copyYamls(pl.getParamProvider());
     initialize_ddynrec();
-    m_ddynrec->publishServicesTopics();
+    //m_ddynrec->publishServicesTopics();
 
     //}
 
     /* subscribers //{ */
 
-    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, m_node_name);
-    m_sub_tf          = nh.subscribe("tf_in", 10, &TFConnector::tf_callback, this);
+    mrs_lib::SubscriberHandlerOptions shopts;
+    shopts.node = node_;
+
+    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, node_->get_name());
+    m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "tf_in", &TFConnector::tf_callback, this);
 
     //}
 
-    if (m_max_update_period > ros::Duration(0))
-      m_tim_tf = nh.createTimer(m_max_update_period, &TFConnector::timer_callback, this);
+    if (m_max_update_period > 0)
+      m_tim_tf = node_->create_wall_timer(std::chrono::duration<double>(1.0 / m_max_update_period), std::bind(&TFConnector::timer_callback, this));
 
-    ROS_INFO("[%s]: Initialized", m_node_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "Initialized");
   }
 
   //}
@@ -558,5 +584,5 @@ public:
 
 }  // namespace mrs_tf_connector
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_tf_connector::TFConnector, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_tf_connector::TFConnector)
