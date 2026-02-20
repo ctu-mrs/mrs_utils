@@ -21,6 +21,9 @@
 #include <mrs_lib/dynparam_mgr.h>
 #include <mrs_lib/node.h>
 
+// YAML
+#include <yaml-cpp/yaml.h>
+
 // std
 #include <string>
 #include <mutex>
@@ -77,7 +80,7 @@ private:
   connection_vec_t m_frame_connections;
   bool             m_ignore_older_msgs;
 
-  tf2_ros::Buffer                             m_tf_buffer;
+  std::unique_ptr<tf2_ros::Buffer>            m_tf_buffer;
   std::unique_ptr<tf2_ros::TransformListener> m_tf_listener_ptr;
 
   mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage> m_sub_tf;
@@ -95,7 +98,7 @@ private:
 public:
   /* tf_callback() method //{ */
 
-  void tf_callback(tf2_msgs::msg::TFMessage::ConstPtr msg_ptr) {
+  void tf_callback(tf2_msgs::msg::TFMessage::ConstSharedPtr msg_ptr) {
     std::scoped_lock lck(m_mtx);
     const rclcpp::Time  now = clock_->now();
     check_timejump(now);
@@ -112,7 +115,7 @@ public:
 
         // TODO: check all frames in the chain, not just the last frame
         const auto& trigger_frame_id = con_ptr->equal_frame_id;
-        if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || tf.header.stamp > con_ptr->last_update)) {
+        if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || rclcpp::Time(tf.header.stamp) > con_ptr->last_update)) {
           con_ptr->change_time = tf.header.stamp;
           changed_connections.push_back(con_ptr);
         }
@@ -161,11 +164,11 @@ public:
       const auto&                     equal_frame_id = con_ptr->equal_frame_id;
       geometry_msgs::msg::TransformStamped new_tf;
       try {
-        new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, con_ptr->change_time);
+        new_tf = m_tf_buffer->lookupTransform(equal_frame_id, root_frame_id, con_ptr->change_time);
       }
       catch (const tf2::TransformException& ex) {
         try {
-          new_tf = m_tf_buffer.lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0));
+          new_tf = m_tf_buffer->lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0));
         }
         catch (const tf2::TransformException& ex) {
           RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(),
@@ -268,19 +271,20 @@ public:
   //}
 
   /* parse_offset() method //{ */
-  double num(const XmlRpc::XmlRpcValue& xml) const {
-    switch (xml.getType()) {
-      case XmlRpc::XmlRpcValue::TypeInt:
-        return (int)xml;
-      case XmlRpc::XmlRpcValue::TypeDouble:
-        return (double)xml;
-      default:
-        return std::numeric_limits<double>::quiet_NaN();
+  double num(const YAML::Node& node) const {
+    try {
+      if (node.IsScalar()) {
+        return node.as<double>();
+      }
+      return std::numeric_limits<double>::quiet_NaN();
+    } catch (const std::exception& e) {
+      RCLCPP_DEBUG(node_->get_logger(), "Failed to parse YAML number: %s", e.what());
+      return std::numeric_limits<double>::quiet_NaN();
     }
   }
 
-  std::optional<offset_keyframe_t> parse_single_offset(const XmlRpc::XmlRpcValue& offset, const size_t it) const {
-    if (offset.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+  std::optional<offset_keyframe_t> parse_single_offset(const YAML::Node& offset, const size_t it) const {
+    if (!offset.IsSequence()) {
       RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection is not an array, skipping");
       return std::nullopt;
     }
@@ -295,7 +299,7 @@ public:
 
       // stamp,x,y,z,yaw
       case 5: {
-        const rclcpp::Time      stamp(num(num(offset[0])));
+        const rclcpp::Time      stamp(static_cast<uint64_t>(num(offset[0])));
         const tf2::Transform tf = to_tf(num(offset[1]), num(offset[2]), num(offset[3]), num(offset[4]));
         return offset_keyframe_t{stamp, tf};
       }
@@ -318,7 +322,7 @@ public:
 
       // stamp,x,y,z,qx,qy,qz,qw
       case 8: {
-        const rclcpp::Time    stamp(num(offset[0]));
+        const rclcpp::Time    stamp(static_cast<uint64_t>(num(offset[0])));
         const tf2::Vector3 translation(num(offset[1]), num(offset[2]), num(offset[3]));
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
@@ -342,29 +346,33 @@ public:
   //}
 
   /* parse_offset_keypoints() method //{ */
-  std::optional<offset_keyframes_t> parse_offset_keypoints(const XmlRpc::XmlRpcValue& offsets_xml, const size_t it) const {
+  std::optional<offset_keyframes_t> parse_offset_keypoints(const YAML::Node& offsets_yaml, const size_t it) const {
     std::optional<offset_keyframes_t> ret;
 
     // first, check if it's an array of arrays - that'd indicate keypoints
-    if (offsets_xml.getType() == XmlRpc::XmlRpcValue::TypeArray && offsets_xml.size() > 0 && offsets_xml[0].getType() == XmlRpc::XmlRpcValue::TypeArray) {
+    if (offsets_yaml.IsSequence() && offsets_yaml.size() > 0 && offsets_yaml[0].IsSequence()) {
       offset_keyframes_t keyframes;
-      keyframes.reserve(offsets_xml.size());
-      for (int el_it = 0; el_it < offsets_xml.size(); el_it++) {
-        const auto parsed = parse_single_offset(offsets_xml[el_it], it);
-        if (parsed.has_value())
+      keyframes.reserve(offsets_yaml.size());
+      for (size_t el_it = 0; el_it < offsets_yaml.size(); el_it++) {
+        const auto parsed = parse_single_offset(offsets_yaml[el_it], it);
+        if (parsed.has_value()) {
           keyframes.push_back(parsed.value());
-        else
+        } else {
           return std::nullopt;
+        }
       }
       ret = keyframes;
     }
     // otherwise it's just a single offset
-    else {
-      const auto parsed = parse_single_offset(offsets_xml, it);
-      if (parsed.has_value())
+    else if (offsets_yaml.IsSequence()) {
+      const auto parsed = parse_single_offset(offsets_yaml, it);
+      if (parsed.has_value()) {
         ret = {parsed.value()};
-      else
+      } else {
         return std::nullopt;
+      }
+    } else {
+      return std::nullopt;
     }
 
     return ret;
@@ -372,26 +380,28 @@ public:
   //}
 
   /* parse_offsets() method //{ */
-  std::optional<std::pair<offset_keyframes_t, offset_keyframes_t>> parse_offsets(const XmlRpc::XmlRpcValue& offsets_xml, const size_t it) const {
+  std::optional<std::pair<offset_keyframes_t, offset_keyframes_t>> parse_offsets(const YAML::Node& offsets_yaml, const size_t it) const {
     std::pair<offset_keyframes_t, offset_keyframes_t> ret;
 
-    for (auto mem_it = std::cbegin(offsets_xml); mem_it != std::cend(offsets_xml); ++mem_it) {
-      const auto& mem_name = mem_it->first;
-      const auto& mem      = mem_it->second;
-      if (mem_name == "intrinsic") {
-        const auto offsets_in_opt = parse_offset_keypoints(offsets_xml["intrinsic"], it);
-        if (!offsets_in_opt.has_value())
-          return std::nullopt;
+    // Default to identity transforms if no offsets specified
+    ret.first = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
+    ret.second = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
+
+    if (!offsets_yaml || !offsets_yaml.IsMap()) {
+      return ret;  // Return identity transforms as defaults
+    }
+
+    if (offsets_yaml["intrinsic"]) {
+      const auto offsets_in_opt = parse_offset_keypoints(offsets_yaml["intrinsic"], it);
+      if (offsets_in_opt.has_value()) {
         ret.first = offsets_in_opt.value();
-      } else if (mem_name == "extrinsic") {
-        const auto offsets_ex_opt = parse_offset_keypoints(offsets_xml["extrinsic"], it);
-        if (!offsets_ex_opt.has_value())
-          return std::nullopt;
+      }
+    }
+
+    if (offsets_yaml["extrinsic"]) {
+      const auto offsets_ex_opt = parse_offset_keypoints(offsets_yaml["extrinsic"], it);
+      if (offsets_ex_opt.has_value()) {
         ret.second = offsets_ex_opt.value();
-      } else {
-        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has an unexpected member '" << mem_name
-                             << "' of 'offsets'. Aborting parse.");
-        return std::nullopt;
       }
     }
 
@@ -400,77 +410,58 @@ public:
   //}
 
   /* parse_connections() method //{ */
-  std::optional<connection_vec_t> parse_connections(const XmlRpc::XmlRpcValue& xmlarr) const {
-    const static std::string root_frame_xmlname  = "root_frame_id";
-    const static std::string equal_frame_xmlname = "equal_frame_id";
-    const static std::string offsets_xmlname     = "offsets";
-    if (xmlarr.getType() != XmlRpc::XmlRpcValue::TypeArray) {
-      RCLCPP_ERROR(node_->get_logger(), "The 'connections' parameter has to be array, but it's not. Cannot parse.");
+  std::optional<connection_vec_t> parse_connections(const YAML::Node& config) const {
+    if (!config["connections"] || !config["connections"].IsSequence()) {
+      RCLCPP_ERROR(node_->get_logger(), "The 'connections' in YAML is not a valid sequence. Cannot parse.");
       return std::nullopt;
     }
 
-    const auto       now = clock_->now();
-    connection_vec_t ret;
-    ret.reserve(xmlarr.size());
+    const auto& yaml_connections = config["connections"];
+    if (yaml_connections.size() == 0) {
+      RCLCPP_ERROR(node_->get_logger(), "The 'connections' parameter is empty. Cannot parse.");
+      return std::nullopt;
+    }
 
-    for (size_t it = 0; it < xmlarr.size(); it++) {
-      const auto& conn_xml = xmlarr[it];
-      if (conn_xml.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
+    connection_vec_t ret;
+    ret.reserve(yaml_connections.size());
+    const auto now = clock_->now();
+
+    for (size_t it = 0; it < yaml_connections.size(); it++) {
+      const auto& conn_yaml = yaml_connections[it];
+      
+      if (!conn_yaml.IsMap()) {
         RCLCPP_ERROR_STREAM(node_->get_logger(), "Invalid type of the " << it << ". member of 'connections'. Cannot parse.");
         return std::nullopt;
       }
 
-      if (!conn_xml.hasMember(root_frame_xmlname) || !conn_xml.hasMember(equal_frame_xmlname)) {
-        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' is missing either the '" << root_frame_xmlname << "' or '"
-                             << equal_frame_xmlname << "' member. Cannot parse.");
+      if (!conn_yaml["root_frame_id"] || !conn_yaml["equal_frame_id"]) {
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' is missing either the 'root_frame_id' or 'equal_frame_id' member. Cannot parse.");
         return std::nullopt;
       }
 
-      auto new_con_ptr  = std::make_shared<frame_connection_t>();
-      bool parsed_root  = false;
-      bool parsed_equal = false;
+      auto con_ptr = std::make_shared<frame_connection_t>();
 
-      for (auto mem_it = std::cbegin(conn_xml); mem_it != std::cend(conn_xml); ++mem_it) {
-        const auto& mem_name = mem_it->first;
-        const auto& mem      = mem_it->second;
-        // firstly, check types
-        if ((mem_name == root_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString) ||
-            (mem_name == equal_frame_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeString) ||
-            (mem_name == offsets_xmlname && mem.getType() != XmlRpc::XmlRpcValue::TypeStruct)) {
-          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has a wrong type of the '" << mem_name
-                               << "' member. Cannot parse.");
-          return std::nullopt;
-        }
+      // Parse frame IDs from YAML
+      con_ptr->root_frame_id = conn_yaml["root_frame_id"].as<std::string>();
+      con_ptr->equal_frame_id = conn_yaml["equal_frame_id"].as<std::string>();
+      con_ptr->same_frames = (con_ptr->root_frame_id == con_ptr->equal_frame_id);
+      con_ptr->last_update = now;
 
-        if (mem_name == root_frame_xmlname) {
-          new_con_ptr->root_frame_id = std::string(mem);
-          parsed_root                = true;
-        } else if (mem_name == equal_frame_xmlname) {
-          new_con_ptr->equal_frame_id = std::string(mem);
-          parsed_equal                = true;
-        } else if (mem_name == offsets_xmlname) {
-          const auto offsets_opt = parse_offsets(mem, it);
-          if (!offsets_opt.has_value())
-            return std::nullopt;
-          const auto& offsets     = offsets_opt.value();
-          new_con_ptr->offsets_in = offsets.first;
-          new_con_ptr->offsets_ex = offsets.second;
-        } else {
-          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "'. Aborting parse.");
-          return std::nullopt;
+      // Parse offsets from YAML if they exist
+      if (conn_yaml["offsets"]) {
+        const auto offsets_opt = parse_offsets(conn_yaml["offsets"], it);
+        if (offsets_opt.has_value()) {
+          const auto& offsets = offsets_opt.value();
+          con_ptr->offsets_in = offsets.first;
+          con_ptr->offsets_ex = offsets.second;
         }
+      } else {
+        // Use identity transforms as defaults
+        con_ptr->offsets_in = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
+        con_ptr->offsets_ex = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
       }
 
-      if (!parsed_root || !parsed_equal) {
-        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' misses a compulsory member '" << root_frame_xmlname << "' or '"
-                             << equal_frame_xmlname << "'. Aborting parse.");
-        return std::nullopt;
-      }
-
-      new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
-      new_con_ptr->last_update = now;
-
-      ret.push_back(new_con_ptr);
+      ret.push_back(con_ptr);
     }
 
     return ret;
@@ -483,28 +474,18 @@ public:
       const std::string& frame_name = el->equal_frame_id;
 
       const std::string group_in = frame_name + "/intrinsic";
-      m_ddynrec->registerVariable(group_in + "/override", &(el->override_in), "if true, overrides the values specified in the config file", false, true,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_in + "/x", &(el->override_in_x), "override value for the intrinsic translation's x component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_in + "/y", &(el->override_in_y), "override value for the intrinsic translation's y component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_in + "/z", &(el->override_in_z), "override value for the intrinsic translation's z component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_in + "/heading", &(el->override_in_heading), "override value for the intrinsic rotations's heading component", -M_PI,
-                                  M_PI, frame_name);
+      m_ddynrec->register_param(group_in + "/override", &(el->override_in));
+      m_ddynrec->register_param(group_in + "/x", &(el->override_in_x), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_in + "/y", &(el->override_in_y), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_in + "/z", &(el->override_in_z), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_in + "/heading", &(el->override_in_heading), 0.0, mrs_lib::DynparamMgr::range_t<double>(-M_PI, M_PI));
 
       const std::string group_ex = frame_name + "/extrinsic";
-      m_ddynrec->registerVariable(group_ex + "/override", &(el->override_ex), "if true, overrides the values specified in the config file", false, true,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_ex + "/x", &(el->override_ex_x), "override value for the extrinsic translation's x component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_ex + "/y", &(el->override_ex_y), "override value for the extrinsic translation's y component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_ex + "/z", &(el->override_ex_z), "override value for the extrinsic translation's z component", -100.0, 100.0,
-                                  frame_name);
-      m_ddynrec->registerVariable(group_ex + "/heading", &(el->override_ex_heading), "override value for the extrinsic rotations's heading component", -M_PI,
-                                  M_PI, frame_name);
+      m_ddynrec->register_param(group_ex + "/override", &(el->override_ex));
+      m_ddynrec->register_param(group_ex + "/x", &(el->override_ex_x), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_ex + "/y", &(el->override_ex_y), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_ex + "/z", &(el->override_ex_z), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
+      m_ddynrec->register_param(group_ex + "/heading", &(el->override_ex_heading), 0.0, mrs_lib::DynparamMgr::range_t<double>(-M_PI, M_PI));
     }
   }
   //}
@@ -512,32 +493,33 @@ public:
   /* onInit() method //{ */
 
   void onInit() {
-    RCLCPP_INFO(node_->get_logger(), "Initializing");
-    node_ = this->this_node_ptr();
+    node_ = this_node_ptr();
     clock_ = node_->get_clock();
 
     /* load parameters //{ */
-
+ 
     RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
     mrs_lib::ParamLoader pl(node_);
-    pl.addYamlFileFromParam("public_config");
 
-    // load custom config
-    std::string custom_config_path;
-
-    pl.loadParam("custom_config", custom_config_path);
-
-    if (custom_config_path != "")
-    {
-      RCLCPP_INFO(node_->get_logger(), "loading custom config '%s", custom_config_path.c_str());
-      pl.addYamlFile(custom_config_path);
-    }
+    std::string public_config_path;
+    pl.loadParam("public_config", public_config_path);
+    pl.addYamlFile(public_config_path);
 
     pl.loadParam("connecting_frame_id", m_connecting_frame_id);
     pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
     pl.loadParam("max_update_period", m_max_update_period);
-    const auto conns_xml = pl.loadParam2<XmlRpc::XmlRpcValue>("connections");
-    const auto conns_opt = parse_connections(conns_xml);
+
+    // Load and parse connections directly from YAML
+    YAML::Node config;
+    try {
+      config = YAML::LoadFile(public_config_path);
+    } catch (const YAML::Exception& e) {
+      RCLCPP_ERROR(node_->get_logger(), "Failed to load YAML config: %s", e.what());
+      rclcpp::shutdown();
+      exit(1);
+    }
+
+    const auto conns_opt = parse_connections(config);
 
     if (!pl.loadedSuccessfully() || !conns_opt.has_value()) {
       RCLCPP_ERROR(node_->get_logger(), "Some compulsory parameters were not loaded or parsed successfully, ending the node");
@@ -549,7 +531,7 @@ public:
 
     //}
 
-    /* publishers //{ */
+    /* publishers //{ */ 
 
     mrs_lib::PublisherHandlerOptions phopts;
     phopts.node = node_;
@@ -568,7 +550,8 @@ public:
     mrs_lib::SubscriberHandlerOptions shopts;
     shopts.node = node_;
 
-    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(m_tf_buffer, node_->get_name());
+    m_tf_buffer       = std::make_unique<tf2_ros::Buffer>(clock_);
+    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
     m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "tf_in", &TFConnector::tf_callback, this);
 
     //}

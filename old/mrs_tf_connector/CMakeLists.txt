@@ -58,7 +58,8 @@ foreach(library IN LISTS LIBRARIES)
 endforeach()
 
 rclcpp_components_register_node(MrsUtils_MRSTFConnector
-  PLUGIN "mrs_tf_connector::MrsUtils_MRSTFConnector"
+  PLUGIN "mrs_tf_connector::TFConnector"
+  EXECUTABLE mrs_tf_connector_MRSTFConnector
 )
 
 ## --------------------------------------------------------------
