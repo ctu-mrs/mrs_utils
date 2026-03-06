@@ -37,9 +37,77 @@ namespace mrs_tf_connector
 
 class TFConnector : public mrs_lib::Node {
 public:
+  /* TFConnector //{ */
   TFConnector(const rclcpp::NodeOptions& options) : mrs_lib::Node("TFConnector", options) {
-    onInit();
+    node_ = this_node_ptr();
+    clock_ = node_->get_clock();
+
+    /* load parameters //{ */
+ 
+    RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
+    mrs_lib::ParamLoader pl(node_);
+
+    std::string public_config_path;
+    pl.loadParam("public_config", public_config_path);
+    pl.addYamlFile(public_config_path);
+
+    pl.loadParam("connecting_frame_id", m_connecting_frame_id);
+    pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
+    pl.loadParam("max_update_period", m_max_update_period);
+
+    // Load and parse connections directly from YAML
+    YAML::Node config;
+    try {
+      config = YAML::LoadFile(public_config_path);
+    } catch (const YAML::Exception& e) {
+      RCLCPP_ERROR(node_->get_logger(), "Failed to load YAML config: %s", e.what());
+      rclcpp::shutdown();
+      exit(1);
+    }
+
+    const auto conns_opt = parse_connections(config);
+
+    if (!pl.loadedSuccessfully() || !conns_opt.has_value()) {
+      RCLCPP_ERROR(node_->get_logger(), "Some compulsory parameters were not loaded or parsed successfully, ending the node");
+      rclcpp::shutdown();
+      exit(1);
+    }
+
+    m_frame_connections = conns_opt.value();
+
+    //}
+
+    /* publishers //{ */ 
+
+    mrs_lib::PublisherHandlerOptions phopts;
+    phopts.node = node_;
+
+    m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "tf_out");
+
+    m_ddynrec = std::make_shared<mrs_lib::DynparamMgr>(node_, mutex_drs_params_);
+    m_ddynrec->get_param_provider().copyYamls(pl.getParamProvider());
+    initialize_ddynrec();
+    //m_ddynrec->publishServicesTopics();
+
+    //}
+
+    /* subscribers //{ */
+
+    mrs_lib::SubscriberHandlerOptions shopts;
+    shopts.node = node_;
+
+    m_tf_buffer       = std::make_unique<tf2_ros::Buffer>(clock_);
+    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
+    m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "tf_in", &TFConnector::tf_callback, this);
+
+    //}
+
+    if (m_max_update_period > 0)
+      m_tim_tf = node_->create_wall_timer(std::chrono::duration<double>(1.0 / m_max_update_period), std::bind(&TFConnector::timer_callback, this));
+
+    RCLCPP_INFO(node_->get_logger(), "Initialized");
   }
+  //}
 
 private:
   struct offset_keyframe_t
@@ -74,9 +142,12 @@ private:
     rclcpp::Time change_time;
   };
 
-  std::mutex  m_mtx;
+  std::mutex mutex_drs_params_;
+  std::mutex m_mtx;
+
   std::string m_connecting_frame_id;
   using connection_vec_t = std::vector<std::shared_ptr<frame_connection_t>>;
+
   connection_vec_t m_frame_connections;
   bool             m_ignore_older_msgs;
 
@@ -88,16 +159,12 @@ private:
   rclcpp::TimerBase::SharedPtr                         m_tim_tf;
   std::shared_ptr<mrs_lib::DynparamMgr>                m_ddynrec;
 
-  std::mutex                            mutex_drs_params_;
-  //DynParams_t                           drs_params_;
-
   rclcpp::Node::SharedPtr      node_;
   rclcpp::Clock::SharedPtr     clock_;
-  double m_max_update_period = 0.1;
+  double                       m_max_update_period = 0.1;
 
 public:
   /* tf_callback() method //{ */
-
   void tf_callback(tf2_msgs::msg::TFMessage::ConstSharedPtr msg_ptr) {
     std::scoped_lock lck(m_mtx);
     const rclcpp::Time  now = clock_->now();
@@ -128,7 +195,6 @@ public:
 
     update_tfs(changed_connections, now);
   }
-
   //}
 
   /* timer_callback() method //{ */
@@ -150,7 +216,6 @@ public:
   //}
 
   /* update_tfs() method //{ */
-
   void update_tfs(const connection_vec_t& changed_connections, const rclcpp::Time& now) {
     // if changed_frame_its is empty, update all frames
     if (changed_connections.empty())
@@ -207,7 +272,6 @@ public:
       m_pub_tf.publish(new_tf_msg);
     }
   }
-
   //}
 
   /* check_timejump() method //{ */
@@ -488,80 +552,6 @@ public:
       m_ddynrec->register_param(group_ex + "/heading", &(el->override_ex_heading), 0.0, mrs_lib::DynparamMgr::range_t<double>(-M_PI, M_PI));
     }
   }
-  //}
-
-  /* onInit() method //{ */
-
-  void onInit() {
-    node_ = this_node_ptr();
-    clock_ = node_->get_clock();
-
-    /* load parameters //{ */
- 
-    RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
-    mrs_lib::ParamLoader pl(node_);
-
-    std::string public_config_path;
-    pl.loadParam("public_config", public_config_path);
-    pl.addYamlFile(public_config_path);
-
-    pl.loadParam("connecting_frame_id", m_connecting_frame_id);
-    pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
-    pl.loadParam("max_update_period", m_max_update_period);
-
-    // Load and parse connections directly from YAML
-    YAML::Node config;
-    try {
-      config = YAML::LoadFile(public_config_path);
-    } catch (const YAML::Exception& e) {
-      RCLCPP_ERROR(node_->get_logger(), "Failed to load YAML config: %s", e.what());
-      rclcpp::shutdown();
-      exit(1);
-    }
-
-    const auto conns_opt = parse_connections(config);
-
-    if (!pl.loadedSuccessfully() || !conns_opt.has_value()) {
-      RCLCPP_ERROR(node_->get_logger(), "Some compulsory parameters were not loaded or parsed successfully, ending the node");
-      rclcpp::shutdown();
-      exit(1);
-    }
-
-    m_frame_connections = conns_opt.value();
-
-    //}
-
-    /* publishers //{ */ 
-
-    mrs_lib::PublisherHandlerOptions phopts;
-    phopts.node = node_;
-
-    m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "tf_out");
-
-    m_ddynrec = std::make_shared<mrs_lib::DynparamMgr>(node_, mutex_drs_params_);
-    m_ddynrec->get_param_provider().copyYamls(pl.getParamProvider());
-    initialize_ddynrec();
-    //m_ddynrec->publishServicesTopics();
-
-    //}
-
-    /* subscribers //{ */
-
-    mrs_lib::SubscriberHandlerOptions shopts;
-    shopts.node = node_;
-
-    m_tf_buffer       = std::make_unique<tf2_ros::Buffer>(clock_);
-    m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
-    m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "tf_in", &TFConnector::tf_callback, this);
-
-    //}
-
-    if (m_max_update_period > 0)
-      m_tim_tf = node_->create_wall_timer(std::chrono::duration<double>(1.0 / m_max_update_period), std::bind(&TFConnector::timer_callback, this));
-
-    RCLCPP_INFO(node_->get_logger(), "Initialized");
-  }
-
   //}
 };
 
