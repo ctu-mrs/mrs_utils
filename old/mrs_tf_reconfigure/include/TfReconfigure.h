@@ -1,32 +1,29 @@
 #ifndef TFRECONFIGURE_H
 #define TFRECONFIGURE_H
 
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <nodelet/nodelet.h>
-#include <dynamic_reconfigure/server.h>
-
+#include <rclcpp/rclcpp.hpp>
+#include <mrs_lib/dynparam_mgr.h>
 #include <mrs_lib/transformer.h>
 
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
-#include <tf2_msgs/TFMessage.h>
+#include <tf2_ros/transform_broadcaster.h>
+// #include <tf2_ros/transform_listener.h>
+#include <tf2_msgs/msg/tf_message.hpp>
 
+#include <mrs_lib/node.h>
 #include <mrs_lib/param_loader.h>
 
-#include <mrs_tf_reconfigure/tfConfig.h>
-
 #include <mutex>
+#include <mrs_lib/mutex.h>
 
 namespace mrs_tf_reconfigure
 {
 
 /* class TfReconfigure //{ */
 
-class TfReconfigure : public nodelet::Nodelet {
+class TfReconfigure : public mrs_lib::Node {
 
 public:
-  virtual void onInit();
+  TfReconfigure(rclcpp::NodeOptions options);
 
   bool is_initialized_ = false;
 
@@ -43,28 +40,58 @@ private:
 
   std::mutex mutex_tf_;
 
-  tf::TransformBroadcaster br_;
-  tf::TransformListener    listener_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> br_;
+  // tf2_ros::TransformListener                     listener_;
 
-  tf::Transform t1_transform_;
-  tf::Transform t2_transform_;
-  tf::Transform t3_transform_;
+  geometry_msgs::msg::TransformStamped t1_transform_;
+  geometry_msgs::msg::TransformStamped t2_transform_;
+  geometry_msgs::msg::TransformStamped t3_transform_;
 
-  boost::recursive_mutex mutex_reconfigure_;
+  struct DynParams_t
+  {
+    // child
+    double child_x;
+    double child_y;
+    double child_z;
+    double child_yaw;
+    double child_pitch;
+    double child_roll;
 
-  boost::shared_ptr<dynamic_reconfigure::Server<mrs_tf_reconfigure::tfConfig>> reconfigure_server_;
+    // g_child
+    double g_child_x2;
+    double g_child_y2;
+    double g_child_z2;
+    double g_child_yaw2;
+    double g_child_pitch2;
+    double g_child_roll2;
 
-  ros::Timer timer_tf_;
+    // g_g_child
+    double g_g_child_x3;
+    double g_g_child_y3;
+    double g_g_child_z3;
+    double g_g_child_yaw3;
+    double g_g_child_pitch3;
+    double g_g_child_roll3;
+  };
+
+  std::mutex                            mutex_reconfigure_;
+  std::shared_ptr<mrs_lib::DynparamMgr> reconfigure_server_;
+  DynParams_t                           drs_params_;
+
+  rclcpp::TimerBase::SharedPtr timer_tf_;
 
   double rate_timer_tf_ = 1.0;
 
-  void timerTf(const ros::TimerEvent& event);
-  void callbackReconfigure([[maybe_unused]] mrs_tf_reconfigure::tfConfig& config, [[maybe_unused]] uint32_t level);
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
+
+  void timerTf();
+  void callbackReconfigure();
   void broadcastTransforms();
 
   //}
 };
 
-}  // namespace mrs_tf_reconfigure
+} // namespace mrs_tf_reconfigure
 
 #endif

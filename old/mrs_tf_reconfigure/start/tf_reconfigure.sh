@@ -32,15 +32,15 @@ pre_input=""
 # define commands
 # 'name' 'command'
 input=(
-  'Roscore' 'roscore
-'
-  'TfReconfigure' "waitForRos; roslaunch mrs_tf_reconfigure tf_reconfigure.launch
+  'Zenoh' "ros2 run rmw_zenoh_cpp rmw_zenohd
 "
-  'RVIZ' "waitForRos; roscd mrs_tf_reconfigure; rosrun rviz rviz -d rviz/tf_reconfigure.rviz
+  'TfReconfigure' "ros2 launch mrs_tf_reconfigure tf_reconfigure.launch.py
 "
-  'Reconfigure' "waitForRos; rosrun rqt_reconfigure rqt_reconfigure
+  'RVIZ' "cd $(ros2 pkg prefix --share mrs_tf_reconfigure); ros2 run rviz2 rviz2 -d rviz/tf_reconfigure.rviz
 "
-  'Layout' "waitForRos; sleep 5; ~/.i3/layout_manager.sh layout.json
+  'Reconfigure' "ros2 run rqt_reconfigure rqt_reconfigure
+"
+  'Layout' "waitForCore; sleep 2; ~/.i3/layout_manager.sh layout.json
 "
 )
 
@@ -126,7 +126,9 @@ done
 # send commands
 for ((i=0; i < ${#cmds[*]}; i++));
 do
-  $TMUX_BIN send-keys -t $SESSION_NAME:$(($i+1)) "cd $SCRIPTPATH;${pre_input};${cmds[$i]}"
+  $TMUX_BIN send-keys -t $SESSION_NAME:$(($i+1)) "cd $SCRIPTPATH;
+${pre_input};
+${cmds[$i]}"
 done
 
 # identify the index of the init window

@@ -1,74 +1,76 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.20)
 project(mrs_tf_reconfigure)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CATKIN_DEPENDENCIES
-  cmake_modules
-  message_runtime
-  dynamic_reconfigure
+set(DEPENDENCIES
   mrs_lib
-  nodelet
-  roscpp
+  mrs_msgs
+  mrs_modules_msgs
+  nav_msgs
+  rclcpp
+  rclcpp_components
   sensor_msgs
   tf2
   tf2_ros
   tf2_sensor_msgs
-  )
+)
 
-find_package(catkin REQUIRED COMPONENTS
-  ${CATKIN_DEPENDENCIES}
-  )
+foreach(DEP IN LISTS DEPENDENCIES)
+  find_package(${DEP} REQUIRED)
+endforeach()
 
-generate_dynamic_reconfigure_options(
-  config/tf.cfg
-  )
+# set the compile options to show code warnings
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra)
+endif()
 
 set(LIBRARIES
   MrsUtils_MRSTFReconfigure
-  )
+)
 
-catkin_package(
-  LIBRARIES ${LIBRARIES}
-  INCLUDE_DIRS include
-  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
-  )
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-  )
-
-add_library(MrsUtils_MRSTFReconfigure
+add_library(MrsUtils_MRSTFReconfigure SHARED
   src/TfReconfigure.cpp
-  )
+)
 
-add_dependencies(MrsUtils_MRSTFReconfigure
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_gencfg
-  )
+ament_target_dependencies(MrsUtils_MRSTFReconfigure
+  ${DEPENDENCIES}
+)
 
-target_link_libraries(MrsUtils_MRSTFReconfigure
-  ${LIBS}
-  ${catkin_LIBRARIES}
-  )
+target_include_directories(MrsUtils_MRSTFReconfigure
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+rclcpp_components_register_node(MrsUtils_MRSTFReconfigure
+  PLUGIN "mrs_tf_reconfigure::TfReconfigure"
+  EXECUTABLE tf_reconfigure_node
+)
 
 ## --------------------------------------------------------------
 ## |                           Install                          |
 ## --------------------------------------------------------------
 
-install(TARGETS ${LIBRARIES}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-  )
+install(TARGETS ${LIBRARIES} EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
-install(DIRECTORY launch config rviz start
+install(DIRECTORY launch rviz start
   USE_SOURCE_PERMISSIONS
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
+  DESTINATION share/${PROJECT_NAME}
+)
 
-install(FILES nodelets.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
+ament_export_targets(
+  export_${PROJECT_NAME} HAS_LIBRARY_TARGET
+)
+
+ament_export_dependencies(
+  ${DEPENDENCIES}
+)
+
+ament_package()
