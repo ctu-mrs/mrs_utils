@@ -27,7 +27,7 @@ SESSION_NAME=mav
 
 # following commands will be executed first in each window
 # * do NOT put ; at the end
-pre_input=""
+pre_input="export UAV_NAME='uav1'"
 
 # define commands
 # 'name' 'command'
@@ -40,7 +40,7 @@ input=(
 "
   'Reconfigure' "ros2 run rqt_reconfigure rqt_reconfigure
 "
-  'Layout' "waitForCore; sleep 2; ~/.i3/layout_manager.sh layout.json
+  'Layout' "sleep 2; ~/.i3/layout_manager.sh layout.json
 "
 )
 
@@ -126,9 +126,7 @@ done
 # send commands
 for ((i=0; i < ${#cmds[*]}; i++));
 do
-  $TMUX_BIN send-keys -t $SESSION_NAME:$(($i+1)) "cd $SCRIPTPATH;
-${pre_input};
-${cmds[$i]}"
+  $TMUX_BIN send-keys -t $SESSION_NAME:$(($i+1)) "cd $SCRIPTPATH; ${pre_input}; ${cmds[$i]}"
 done
 
 # identify the index of the init window
