@@ -474,14 +474,14 @@ public:
       const std::string& frame_name = el->equal_frame_id;
 
       const std::string group_in = frame_name + "/intrinsic";
-      m_ddynrec->register_param(group_in + "/override", &(el->override_in));
+      m_ddynrec->register_param(group_in + "/override", &(el->override_in), false);
       m_ddynrec->register_param(group_in + "/x", &(el->override_in_x), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
       m_ddynrec->register_param(group_in + "/y", &(el->override_in_y), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
       m_ddynrec->register_param(group_in + "/z", &(el->override_in_z), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
       m_ddynrec->register_param(group_in + "/heading", &(el->override_in_heading), 0.0, mrs_lib::DynparamMgr::range_t<double>(-M_PI, M_PI));
 
       const std::string group_ex = frame_name + "/extrinsic";
-      m_ddynrec->register_param(group_ex + "/override", &(el->override_ex));
+      m_ddynrec->register_param(group_ex + "/override", &(el->override_ex), false);
       m_ddynrec->register_param(group_ex + "/x", &(el->override_ex_x), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
       m_ddynrec->register_param(group_ex + "/y", &(el->override_ex_y), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
       m_ddynrec->register_param(group_ex + "/z", &(el->override_ex_z), 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0));
