@@ -142,7 +142,7 @@ def generate_launch_description():
 
         package=pkg_name,
         plugin=pkg_name+'::TfReconfigure',
-        namespace=uav_name,
+        namespace='',
         name=namespace,
 
         parameters=[

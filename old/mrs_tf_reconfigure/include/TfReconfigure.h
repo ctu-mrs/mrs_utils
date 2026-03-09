@@ -86,7 +86,7 @@ private:
   rclcpp::Clock::SharedPtr clock_;
 
   void timerTf();
-  void callbackReconfigure();
+  void callbackReconfigure([[maybe_unused]] const double &dummy);
   void broadcastTransforms();
 
   //}

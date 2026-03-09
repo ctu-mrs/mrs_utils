@@ -39,49 +39,34 @@ TfReconfigure::TfReconfigure(rclcpp::NodeOptions options) : Node("TfReconfigure"
   // --------------------------------------------------------------
 
   reconfigure_server_ = std::make_shared<mrs_lib::DynparamMgr>(node_, mutex_reconfigure_);
-  reconfigure_server_->get_param_provider().copyYamls(pl.getParamProvider());
+  // reconfigure_server_->get_param_provider().copyYamls(pl.getParamProvider());
+
+  // Create callback wrapper with matching signature
+  std::function<void(const double &)> callback = std::bind(&TfReconfigure::callbackReconfigure, this, std::placeholders::_1);
 
   // child
-  reconfigure_server_->register_param("child.x", &drs_params_.child_x, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("child.y", &drs_params_.child_y, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("child.z", &drs_params_.child_z, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("child.yaw", &drs_params_.child_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("child.pitch", &drs_params_.child_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("child.roll", &drs_params_.child_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
+  reconfigure_server_->register_param("child.x", &drs_params_.child_x, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("child.y", &drs_params_.child_y, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("child.z", &drs_params_.child_z, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("child.yaw", &drs_params_.child_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("child.pitch", &drs_params_.child_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("child.roll", &drs_params_.child_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
 
   // g_child
-  reconfigure_server_->register_param("g_child.x2", &drs_params_.g_child_x2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_child.y2", &drs_params_.g_child_y2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_child.z2", &drs_params_.g_child_z2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_child.yaw2", &drs_params_.g_child_yaw2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_child.pitch2", &drs_params_.g_child_pitch2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_child.roll2", &drs_params_.g_child_roll2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
+  reconfigure_server_->register_param("g_child.x2", &drs_params_.g_child_x2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_child.y2", &drs_params_.g_child_y2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_child.z2", &drs_params_.g_child_z2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_child.yaw2", &drs_params_.g_child_yaw2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_child.pitch2", &drs_params_.g_child_pitch2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_child.roll2", &drs_params_.g_child_roll2, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
 
   // g_g_child
-  reconfigure_server_->register_param("g_g_child.x3", &drs_params_.g_g_child_x3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_g_child.y3", &drs_params_.g_g_child_y3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_g_child.z3", &drs_params_.g_g_child_z3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_g_child.yaw3", &drs_params_.g_g_child_yaw3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_g_child.pitch3", &drs_params_.g_g_child_pitch3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
-  reconfigure_server_->register_param("g_g_child.roll3", &drs_params_.g_g_child_roll3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14),
-                                      (std::function<void(const double &)>)std::bind(&TfReconfigure::callbackReconfigure, this));
+  reconfigure_server_->register_param("g_g_child.x3", &drs_params_.g_g_child_x3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_g_child.y3", &drs_params_.g_g_child_y3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_g_child.z3", &drs_params_.g_g_child_z3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
+  reconfigure_server_->register_param("g_g_child.yaw3", &drs_params_.g_g_child_yaw3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_g_child.pitch3", &drs_params_.g_g_child_pitch3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_g_child.roll3", &drs_params_.g_g_child_roll3, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
 
   transformer_ = std::make_unique<mrs_lib::Transformer>(node_);
   transformer_->retryLookupNewest(true);
@@ -169,53 +154,53 @@ void TfReconfigure::timerTf() {
 //}
 
 /* //{ callbackReconfigure() */
-void TfReconfigure::callbackReconfigure() {
+void TfReconfigure::callbackReconfigure([[maybe_unused]] const double &dummy) {
 
   if (!is_initialized_) {
     return;
   }
 
-  auto drs_params = mrs_lib::get_mutexed(mutex_reconfigure_, drs_params_);
+  // auto drs_params = mrs_lib::get_mutexed(mutex_reconfigure_, drs_params_);
 
-  modified_g_child_ |= (drs_params.g_child_roll2 != 0.0) | (drs_params.g_child_pitch2 != 0.0) | (drs_params.g_child_yaw2 != 0.0) |
-                       (drs_params.g_child_x2 != 0.0) | (drs_params.g_child_y2 != 0.0) | (drs_params.g_child_z2 != 0.0);
+  modified_g_child_ |= (drs_params_.g_child_roll2 != 0.0) | (drs_params_.g_child_pitch2 != 0.0) | (drs_params_.g_child_yaw2 != 0.0) |
+                       (drs_params_.g_child_x2 != 0.0) | (drs_params_.g_child_y2 != 0.0) | (drs_params_.g_child_z2 != 0.0);
 
-  modified_g_g_child_ |= (drs_params.g_g_child_roll3 != 0.0) | (drs_params.g_g_child_pitch3 != 0.0) | (drs_params.g_g_child_yaw3 != 0.0) |
-                         (drs_params.g_g_child_x3 != 0.0) | (drs_params.g_g_child_y3 != 0.0) | (drs_params.g_g_child_z3 != 0.0);
+  modified_g_g_child_ |= (drs_params_.g_g_child_roll3 != 0.0) | (drs_params_.g_g_child_pitch3 != 0.0) | (drs_params_.g_g_child_yaw3 != 0.0) |
+                         (drs_params_.g_g_child_x3 != 0.0) | (drs_params_.g_g_child_y3 != 0.0) | (drs_params_.g_g_child_z3 != 0.0);
 
   tf2::Quaternion q;
-  q.setRPY(drs_params.child_roll, drs_params.child_pitch, drs_params.child_yaw);
+  q.setRPY(drs_params_.child_roll, drs_params_.child_pitch, drs_params_.child_yaw);
   q.normalize();
 
   tf2::Quaternion q2;
-  q2.setRPY(drs_params.g_child_roll2, drs_params.g_child_pitch2, drs_params.g_child_yaw2);
+  q2.setRPY(drs_params_.g_child_roll2, drs_params_.g_child_pitch2, drs_params_.g_child_yaw2);
   q2.normalize();
 
   tf2::Quaternion q3;
-  q3.setRPY(drs_params.g_g_child_roll3, drs_params.g_g_child_pitch3, drs_params.g_g_child_yaw3);
+  q3.setRPY(drs_params_.g_g_child_roll3, drs_params_.g_g_child_pitch3, drs_params_.g_g_child_yaw3);
   q3.normalize();
 
   /* RCLCPP_INFO(node_->get_logger(), "quaternion: x: %f y: %f z: %f w: %f", q.getX(), q.getY(), q.getZ(), q.getW()); */
 
   {
     std::scoped_lock lock(mutex_tf_);
-    t1_transform_.transform.translation.x = drs_params.child_x;
-    t1_transform_.transform.translation.y = drs_params.child_y;
-    t1_transform_.transform.translation.z = drs_params.child_z;
+    t1_transform_.transform.translation.x = drs_params_.child_x;
+    t1_transform_.transform.translation.y = drs_params_.child_y;
+    t1_transform_.transform.translation.z = drs_params_.child_z;
     tf2::convert(q, t1_transform_.transform.rotation);
 
-    t2_transform_.transform.translation.x = drs_params.g_child_x2;
-    t2_transform_.transform.translation.y = drs_params.g_child_y2;
-    t2_transform_.transform.translation.z = drs_params.g_child_z2;
+    t2_transform_.transform.translation.x = drs_params_.g_child_x2;
+    t2_transform_.transform.translation.y = drs_params_.g_child_y2;
+    t2_transform_.transform.translation.z = drs_params_.g_child_z2;
     tf2::convert(q2, t2_transform_.transform.rotation);
 
-    t3_transform_.transform.translation.x = drs_params.g_g_child_x3;
-    t3_transform_.transform.translation.y = drs_params.g_g_child_y3;
-    t3_transform_.transform.translation.z = drs_params.g_g_child_z3;
+    t3_transform_.transform.translation.x = drs_params_.g_g_child_x3;
+    t3_transform_.transform.translation.y = drs_params_.g_g_child_y3;
+    t3_transform_.transform.translation.z = drs_params_.g_g_child_z3;
     tf2::convert(q3, t3_transform_.transform.rotation);
   }
 
-  broadcastTransforms();
+  // broadcastTransforms();
   broadcastTransforms();
 
   geometry_msgs::msg::TransformStamped tf;
