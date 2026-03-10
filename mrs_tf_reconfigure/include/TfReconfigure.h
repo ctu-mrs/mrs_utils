@@ -16,14 +16,14 @@
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/timer_handler.h>
 
+namespace mrs_tf_reconfigure
+{
+
 #if USE_ROS_TIMER == 1
 typedef mrs_lib::ROSTimer TimerType;
 #else
 typedef mrs_lib::ThreadTimer TimerType;
 #endif
-
-namespace mrs_tf_reconfigure
-{
 
 /* class TfReconfigure //{ */
 
