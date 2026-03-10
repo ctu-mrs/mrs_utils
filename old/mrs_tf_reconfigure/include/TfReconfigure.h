@@ -14,6 +14,13 @@
 
 #include <mutex>
 #include <mrs_lib/mutex.h>
+#include <mrs_lib/timer_handler.h>
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 namespace mrs_tf_reconfigure
 {
@@ -28,10 +35,10 @@ public:
   bool is_initialized_ = false;
 
 private:
-  std::string frame_parent_          = "parent";
-  std::string frame_child_           = "child";
-  std::string frame_grandchild_      = "g_child";
-  std::string frame_greatgrandchild_ = "g_g_child";
+  std::string frame_parent_          = "frame_parent";
+  std::string frame_child_           = "frame_child";
+  std::string frame_grandchild_      = "frame_grandchild";
+  std::string frame_greatgrandchild_ = "frame_greatgrandchild";
 
   bool modified_g_child_   = false;
   bool modified_g_g_child_ = false;
@@ -50,43 +57,44 @@ private:
   struct DynParams_t
   {
     // child
+    double child_o_pitch;
+    double child_o_roll;
+    double child_o_yaw;
     double child_x;
     double child_y;
     double child_z;
-    double child_yaw;
-    double child_pitch;
-    double child_roll;
 
     // g_child
-    double g_child_x2;
-    double g_child_y2;
-    double g_child_z2;
-    double g_child_yaw2;
-    double g_child_pitch2;
-    double g_child_roll2;
+    double g_child_o_pitch;
+    double g_child_o_roll;
+    double g_child_o_yaw;
+    double g_child_x;
+    double g_child_y;
+    double g_child_z;
 
     // g_g_child
-    double g_g_child_x3;
-    double g_g_child_y3;
-    double g_g_child_z3;
-    double g_g_child_yaw3;
-    double g_g_child_pitch3;
-    double g_g_child_roll3;
+    double g_g_child_o_pitch;
+    double g_g_child_o_roll;
+    double g_g_child_o_yaw;
+    double g_g_child_x;
+    double g_g_child_y;
+    double g_g_child_z;
   };
 
   std::mutex                            mutex_reconfigure_;
   std::shared_ptr<mrs_lib::DynparamMgr> reconfigure_server_;
   DynParams_t                           drs_params_;
 
-  rclcpp::TimerBase::SharedPtr timer_tf_;
+  std::shared_ptr<TimerType> timer_tf_;
+  bool                       params_dirty_ = false;
 
-  double rate_timer_tf_ = 1.0;
+  double rate_timer_tf_ = 20.0;
 
   rclcpp::Node::SharedPtr  node_;
   rclcpp::Clock::SharedPtr clock_;
 
   void timerTf();
-  void callbackReconfigure([[maybe_unused]] const double &dummy);
+  void callbackReconfigure([[maybe_unused]] const double &value);
   void broadcastTransforms();
 
   //}

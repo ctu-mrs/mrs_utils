@@ -68,66 +68,6 @@ def generate_launch_description():
 
     # #} end of use_sim_time
 
-    # #{ frame_parent
-
-    frame_parent = LaunchConfiguration('frame_parent')
-
-    ld.add_action(DeclareLaunchArgument(
-        'frame_parent',
-        default_value='frame_parent',
-        description='The parent frame of the tf reconfigure node.',
-    ))
-
-    # #} end of frame_parent
-
-    # #{ frame_child
-
-    frame_child = LaunchConfiguration('frame_child')
-
-    ld.add_action(DeclareLaunchArgument(
-        'frame_child',
-        default_value='frame_child',
-        description='The child frame of the tf reconfigure node.',
-    ))
-
-    # #} end of frame_child
-
-    # #{ frame_grandchild
-
-    frame_grandchild = LaunchConfiguration('frame_grandchild')
-
-    ld.add_action(DeclareLaunchArgument(
-        'frame_grandchild',
-        default_value='frame_grandchild',
-        description='The grandchild frame of the tf reconfigure node.',
-    ))
-
-    # #} end of frame_grandchild
-
-    # #{ frame_greatgrandchild
-
-    frame_greatgrandchild = LaunchConfiguration('frame_greatgrandchild')
-
-    ld.add_action(DeclareLaunchArgument(
-        'frame_greatgrandchild',
-        default_value='frame_greatgrandchild',
-        description='The greatgrandchild frame of the tf reconfigure node.',
-    ))
-
-    # #} end of frame_greatgrandchild
-
-    # #{ publish_rate
-
-    publish_rate = LaunchConfiguration('publish_rate')
-
-    ld.add_action(DeclareLaunchArgument(
-        'publish_rate',
-        default_value='10',
-        description='The publish rate of the tf reconfigure node.',
-    ))
-
-    # #} end of publish_rate
-
     # #{ log_level
 
     ld.add_action(DeclareLaunchArgument(name='log_level', default_value='info'))
@@ -148,11 +88,6 @@ def generate_launch_description():
         parameters=[
             {'uav_name': uav_name},
             {'use_sim_time': use_sim_time},
-            {'frame_parent': frame_parent},
-            {'frame_child': frame_child},
-            {'frame_grandchild': frame_grandchild},
-            {'frame_greatgrandchild': frame_greatgrandchild},
-            {'publish_rate': publish_rate},
         ],
 
         remappings=[
