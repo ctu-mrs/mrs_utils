@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(USE_ROS_TIMER 0)
 
 if(${USE_ROS_TIMER})
-  MESSAGE(WARNING "[mrs_octomap_server]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
+  MESSAGE(WARNING "[mrs_tf_reconfigure]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
 endif()
 
 set(DEPENDENCIES
