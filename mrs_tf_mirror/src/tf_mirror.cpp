@@ -1,26 +1,28 @@
 /* includes //{ */
 
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <nodelet/nodelet.h>
-
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/attitude_converter.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/transform_broadcaster.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
+#include <mrs_lib/timer_handler.h>
+#include <mrs_lib/node.h>
 
-#include <nav_msgs/Odometry.h>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <tf2_ros/static_transform_broadcaster.h>
-
-#include <eigen3/Eigen/Eigen>
 
 //}
 
 namespace mrs_tf_mirror
 {
+
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
 
 /* structs //{ */
 
@@ -45,7 +47,7 @@ typedef struct
   std::string out_tf_from;
   std::string out_tf_to;
 
-  std::shared_ptr<ros::Timer> timer;
+  std::shared_ptr<rclcpp::TimerBase::SharedPtr> timer;
 
 } Params_t;
 
@@ -53,19 +55,20 @@ typedef struct
 
 /* class MrsTfMirror //{ */
 
-class TfMirror : public nodelet::Nodelet {
+class TfMirror : public mrs_lib::Node {
 
 public:
-  virtual void onInit();
+  TfMirror(rclcpp::NodeOptions options);
 
   bool is_initialized_ = false;
 
 private:
-  ros::NodeHandle nh_;
+  rclcpp::Node::SharedPtr  node_;
+  rclcpp::Clock::SharedPtr clock_;
 
-  std::map<std::string, ros::Timer> tf_timers_;
+  std::map<std::string, std::shared_ptr<TimerType>> tf_timers_;
 
-  void timerTf(const ros::TimerEvent& event, const Params_t params);
+  void timerTf(const Params_t params);
 
   std::vector<std::string> _tfs_;
 
@@ -75,14 +78,14 @@ private:
 
   // | ------------------------ callbacks ----------------------- |
 
-  std::vector<mrs_lib::SubscribeHandler<nav_msgs::Odometry>> sh_odoms_;
+  std::vector<mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>> sh_odoms_;
 
-  void callbackOdometry(const nav_msgs::Odometry::ConstPtr& msg, const Params_t params);
+  void callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr &msg, const Params_t params);
 
   // | ------------------ static tf broadcaster ----------------- |
 
-  tf2_ros::StaticTransformBroadcaster tf_static_broadcaster_;
-  std::mutex                          mutex_tf_static_broadcaster_;
+  std::unique_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+  std::mutex                                           mutex_tf_static_broadcaster_;
 
   // | ----------------- dynamic tf broadcaster ----------------- |
 
@@ -91,28 +94,28 @@ private:
 
   // | ------------------------ routines ------------------------ |
 
-  tf2::Transform tf2FromPose(const geometry_msgs::Pose& pose_in);
+  tf2::Transform tf2FromPose(const geometry_msgs::msg::Pose &pose_in);
 
-  geometry_msgs::Transform msgFromTf2(const tf2::Transform& tf_in);
+  geometry_msgs::msg::Transform msgFromTf2(const tf2::Transform &tf_in);
 
-  tf2::Transform tf2FromMsg(const geometry_msgs::Transform& tf_in);
+  tf2::Transform tf2FromMsg(const geometry_msgs::msg::Transform &tf_in);
 
-  geometry_msgs::Pose poseFromTf2(const tf2::Transform& tf_in);
+  geometry_msgs::msg::Pose poseFromTf2(const tf2::Transform &tf_in);
 
-  geometry_msgs::Vector3 pointToVector3(const geometry_msgs::Point& point_in);
+  geometry_msgs::msg::Vector3 pointToVector3(const geometry_msgs::msg::Point &point_in);
 };
 
 //}
 
 /* onInit() //{ */
 
-void TfMirror::onInit() {
+TfMirror::TfMirror(rclcpp::NodeOptions options) : Node("TfMirror", options) {
 
-  ROS_INFO("[TfMirror]: Initializing");
+  node_                  = this_node_ptr();
+  clock_                 = node_->get_clock();
+  tf_static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(node_);
 
-  nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-
-  ros::Time::waitForValid();
+  RCLCPP_INFO(node_->get_logger(), "Initializing");
 
   // | --------------------- tf broadcasters -------------------- |
 
@@ -120,29 +123,41 @@ void TfMirror::onInit() {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_shared<mrs_lib::Transformer>(nh_, "TfMirror");
+  transformer_ = std::make_shared<mrs_lib::Transformer>(node_);
   transformer_->retryLookupNewest(true);
 
   // | --------------------- subscriber opts -------------------- |
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = _uav_name_;
+  mrs_lib::SubscriberHandlerOptions shopts;
+  shopts.node               = node_;
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 10;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
+
+  // | --------------------- timer opts -------------------- |
+
+  mrs_lib::TimerHandlerOptions thopts;
+  thopts.node      = node_;
+  thopts.autostart = true;
 
   // | ------------------------- params ------------------------- |
 
-  mrs_lib::ParamLoader param_loader(nh_, "TfMirror");
+  mrs_lib::ParamLoader param_loader(node_);
+  std::string          custom_config_path;
 
-  param_loader.loadParam("UAV_NAME", _uav_name_);
+  param_loader.loadParam("custom_config", custom_config_path);
+
+  if (custom_config_path != "") {
+    param_loader.addYamlFile(custom_config_path);
+  }
+
+  param_loader.addYamlFileFromParam("config");
+
+  param_loader.loadParam("uav_name", _uav_name_);
 
   param_loader.loadParam("tfs", _tfs_);
 
-  for (auto& tf : _tfs_) {
+  for (auto &tf : _tfs_) {
 
     Params_t params;
 
@@ -152,13 +167,15 @@ void TfMirror::onInit() {
     param_loader.loadParam(tf + "/source/odometry/enabled", params.odom_source_enabled, false);
 
     if (params.tf_source_enabled && params.odom_source_enabled) {
-      ROS_ERROR("[TfMirror]: both TF and Odom source are enabled for '%s'", tf.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "both TF and Odom source are enabled for '%s'", tf.c_str());
+      std::exit(1);
+      rclcpp::shutdown();
     }
 
     if (!params.tf_source_enabled && !params.odom_source_enabled) {
-      ROS_ERROR("[TfMirror]: neither TF and Odom source are enabled for '%s'", tf.c_str());
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "neither TF and Odom source are enabled for '%s'", tf.c_str());
+      std::exit(1);
+      rclcpp::shutdown();
     }
 
     bool source_prepand_uav_name;
@@ -202,20 +219,21 @@ void TfMirror::onInit() {
     }
 
     if (!param_loader.loadedSuccessfully()) {
-      ROS_ERROR("[TfMirror]: failed to load parameters");
-      ros::shutdown();
+      RCLCPP_ERROR(node_->get_logger(), "failed to load parameters");
+      std::exit(1);
+      rclcpp::shutdown();
     }
 
     // | ------------------- create a subscriber ------------------ |
 
     if (params.odom_source_enabled) {
-      sh_odoms_.push_back(mrs_lib::SubscribeHandler<nav_msgs::Odometry>(shopts, params.odom_topic,
-                                                                        std::bind(&TfMirror::callbackOdometry, this, std::placeholders::_1, params)));
+      sh_odoms_.push_back(mrs_lib::SubscriberHandler<nav_msgs::msg::Odometry>(shopts, params.odom_topic,
+                                                                              std::bind(&TfMirror::callbackOdometry, this, std::placeholders::_1, params)));
     }
 
     if (params.tf_source_enabled) {
 
-      tf_timers_[tf] = nh_.createTimer(ros::Duration(1.0 / params.tf_poll_rate), std::bind(&TfMirror::timerTf, this, std::placeholders::_1, params));
+      tf_timers_[tf] = std::make_shared<TimerType>(thopts, rclcpp::Rate(params.tf_poll_rate, clock_), std::bind(&TfMirror::timerTf, this, params));
     }
   }
 
@@ -223,7 +241,7 @@ void TfMirror::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[TfMirror]: initialized");
+  RCLCPP_INFO(node_->get_logger(), "initialized");
 }
 
 //}
@@ -232,7 +250,7 @@ void TfMirror::onInit() {
 
 /* callbackOdometry() //{ */
 
-void TfMirror::callbackOdometry(const nav_msgs::Odometry::ConstPtr& msg, const Params_t params) {
+void TfMirror::callbackOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr &msg, const Params_t params) {
 
   if (!is_initialized_) {
     return;
@@ -244,9 +262,9 @@ void TfMirror::callbackOdometry(const nav_msgs::Odometry::ConstPtr& msg, const P
     tf = tf.inverse();
   }
 
-  const geometry_msgs::Pose pose = poseFromTf2(tf);
+  const geometry_msgs::msg::Pose pose = poseFromTf2(tf);
 
-  geometry_msgs::TransformStamped tf_msg;
+  geometry_msgs::msg::TransformStamped tf_msg;
 
   tf_msg.transform.translation = pointToVector3(pose.position);
   tf_msg.transform.rotation    = pose.orientation;
@@ -266,7 +284,7 @@ void TfMirror::callbackOdometry(const nav_msgs::Odometry::ConstPtr& msg, const P
 
 /* timerTf() //{ */
 
-void TfMirror::timerTf(const ros::TimerEvent& event, const Params_t params) {
+void TfMirror::timerTf(const Params_t params) {
 
   if (!is_initialized_) {
     return;
@@ -275,7 +293,7 @@ void TfMirror::timerTf(const ros::TimerEvent& event, const Params_t params) {
   auto tf_in = transformer_->getTransform(params.in_tf_from, params.in_tf_to);
 
   if (!tf_in) {
-    ROS_WARN_THROTTLE(1.0, "[TfMirror]: could not find tf from '%s' to '%s'", params.in_tf_from.c_str(), params.in_tf_to.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "could not find tf from '%s' to '%s'", params.in_tf_from.c_str(), params.in_tf_to.c_str());
     return;
   }
 
@@ -285,9 +303,9 @@ void TfMirror::timerTf(const ros::TimerEvent& event, const Params_t params) {
     tf = tf.inverse();
   }
 
-  const geometry_msgs::Pose pose = poseFromTf2(tf);
+  const geometry_msgs::msg::Pose pose = poseFromTf2(tf);
 
-  geometry_msgs::TransformStamped tf_msg;
+  geometry_msgs::msg::TransformStamped tf_msg;
 
   tf_msg.transform.translation = pointToVector3(pose.position);
   tf_msg.transform.rotation    = pose.orientation;
@@ -301,12 +319,12 @@ void TfMirror::timerTf(const ros::TimerEvent& event, const Params_t params) {
     {
       std::scoped_lock lock(mutex_tf_static_broadcaster_);
 
-      tf_static_broadcaster_.sendTransform(tf_msg);
+      tf_static_broadcaster_->sendTransform(tf_msg);
     }
 
-    ROS_INFO("[TfMirror]: stopping timer for static tf '%s'", params.tf_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "stopping timer for static tf '%s'", params.tf_name.c_str());
 
-    tf_timers_.at(params.tf_name).stop();
+    tf_timers_.at(params.tf_name)->stop();
 
   } else {
 
@@ -324,7 +342,7 @@ void TfMirror::timerTf(const ros::TimerEvent& event, const Params_t params) {
 
 /* tf2FromPose() //{ */
 
-tf2::Transform TfMirror::tf2FromPose(const geometry_msgs::Pose& pose_in) {
+tf2::Transform TfMirror::tf2FromPose(const geometry_msgs::msg::Pose &pose_in) {
 
   tf2::Vector3 position(pose_in.position.x, pose_in.position.y, pose_in.position.z);
 
@@ -340,9 +358,9 @@ tf2::Transform TfMirror::tf2FromPose(const geometry_msgs::Pose& pose_in) {
 
 /* msgFromTf2() //{ */
 
-geometry_msgs::Transform TfMirror::msgFromTf2(const tf2::Transform& tf_in) {
+geometry_msgs::msg::Transform TfMirror::msgFromTf2(const tf2::Transform &tf_in) {
 
-  geometry_msgs::Transform tf_out;
+  geometry_msgs::msg::Transform tf_out;
 
   tf_out.translation.x = tf_in.getOrigin().getX();
   tf_out.translation.y = tf_in.getOrigin().getY();
@@ -357,7 +375,7 @@ geometry_msgs::Transform TfMirror::msgFromTf2(const tf2::Transform& tf_in) {
 
 /* tf2FromMsg() //{ */
 
-tf2::Transform TfMirror::tf2FromMsg(const geometry_msgs::Transform& tf_in) {
+tf2::Transform TfMirror::tf2FromMsg(const geometry_msgs::msg::Transform &tf_in) {
 
   tf2::Transform tf_out;
 
@@ -371,9 +389,9 @@ tf2::Transform TfMirror::tf2FromMsg(const geometry_msgs::Transform& tf_in) {
 
 /* poseFromTf2() //{ */
 
-geometry_msgs::Pose TfMirror::poseFromTf2(const tf2::Transform& tf_in) {
+geometry_msgs::msg::Pose TfMirror::poseFromTf2(const tf2::Transform &tf_in) {
 
-  geometry_msgs::Pose pose_out;
+  geometry_msgs::msg::Pose pose_out;
 
   pose_out.position.x = tf_in.getOrigin().getX();
   pose_out.position.y = tf_in.getOrigin().getY();
@@ -388,9 +406,9 @@ geometry_msgs::Pose TfMirror::poseFromTf2(const tf2::Transform& tf_in) {
 
 /* pointToVector3() //{ */
 
-geometry_msgs::Vector3 TfMirror::pointToVector3(const geometry_msgs::Point& point_in) {
+geometry_msgs::msg::Vector3 TfMirror::pointToVector3(const geometry_msgs::msg::Point &point_in) {
 
-  geometry_msgs::Vector3 vec_out;
+  geometry_msgs::msg::Vector3 vec_out;
 
   vec_out.x = point_in.x;
   vec_out.y = point_in.y;
@@ -401,7 +419,7 @@ geometry_msgs::Vector3 TfMirror::pointToVector3(const geometry_msgs::Point& poin
 
 //}
 
-}  // namespace mrs_tf_mirror
+} // namespace mrs_tf_mirror
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_tf_mirror::TfMirror, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_tf_mirror::TfMirror)
