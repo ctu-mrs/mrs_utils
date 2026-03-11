@@ -193,8 +193,8 @@ public:
 
         // TODO: check all frames in the chain, not just the last frame
         const auto& trigger_frame_id = con_ptr->equal_frame_id;
-        if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || rclcpp::Time(tf.header.stamp) > con_ptr->last_update)) {
-          con_ptr->change_time = tf.header.stamp;
+        if (tf.child_frame_id == trigger_frame_id && (!m_ignore_older_msgs || rclcpp::Time(tf.header.stamp, clock_->get_clock_type()) > con_ptr->last_update)) {
+          con_ptr->change_time = rclcpp::Time(tf.header.stamp, clock_->get_clock_type());
           changed_connections.push_back(con_ptr);
         }
       }
@@ -244,7 +244,7 @@ public:
       }
       catch (const tf2::TransformException& ex) {
         try {
-          new_tf = m_tf_buffer->lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0));
+          new_tf = m_tf_buffer->lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0, 0, clock_->get_clock_type()));
         }
         catch (const tf2::TransformException& ex) {
           RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(),
@@ -254,7 +254,7 @@ public:
       }
 
       // handle weird edge-cases like static transforms and transforms from-to the same frame
-      if (rclcpp::Time(new_tf.header.stamp) == rclcpp::Time(0) || new_tf.child_frame_id == new_tf.header.frame_id)
+      if (rclcpp::Time(new_tf.header.stamp, clock_->get_clock_type()) == rclcpp::Time(0, 0, clock_->get_clock_type()) || new_tf.child_frame_id == new_tf.header.frame_id)
         new_tf.header.stamp = now;
 
       new_tf.child_frame_id  = root_frame_id;
@@ -374,7 +374,7 @@ public:
 
       // stamp,x,y,z,yaw
       case 5: {
-        const rclcpp::Time      stamp(static_cast<uint64_t>(num(offset[0])));
+        const rclcpp::Time      stamp(static_cast<uint64_t>(num(offset[0])), clock_->get_clock_type());
         const tf2::Transform tf = to_tf(num(offset[1]), num(offset[2]), num(offset[3]), num(offset[4]));
         return offset_keyframe_t{stamp, tf};
       }
@@ -397,7 +397,7 @@ public:
 
       // stamp,x,y,z,qx,qy,qz,qw
       case 8: {
-        const rclcpp::Time    stamp(static_cast<uint64_t>(num(offset[0])));
+        const rclcpp::Time    stamp(static_cast<uint64_t>(num(offset[0])), clock_->get_clock_type());
         const tf2::Vector3 translation(num(offset[1]), num(offset[2]), num(offset[3]));
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
@@ -459,8 +459,8 @@ public:
     std::pair<offset_keyframes_t, offset_keyframes_t> ret;
 
     // Default to identity transforms if no offsets specified
-    ret.first = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
-    ret.second = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
+    ret.first = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
+    ret.second = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
 
     if (!offsets_yaml || !offsets_yaml.IsMap()) {
       return ret;  // Return identity transforms as defaults
@@ -532,8 +532,8 @@ public:
         }
       } else {
         // Use identity transforms as defaults
-        con_ptr->offsets_in = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
-        con_ptr->offsets_ex = {offset_keyframe_t{rclcpp::Time(0), tf2::Transform::getIdentity()}};
+        con_ptr->offsets_in = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
+        con_ptr->offsets_ex = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
       }
 
       ret.push_back(con_ptr);
