@@ -367,7 +367,7 @@ public:
     switch (offset.size()) {
       // x,y,z,yaw
       case 4: {
-        const rclcpp::Time      stamp(0);
+        const rclcpp::Time      stamp(0, 0, clock_->get_clock_type());
         const tf2::Transform tf = to_tf(num(offset[0]), num(offset[1]), num(offset[2]), num(offset[3]));
         return offset_keyframe_t{stamp, tf};
       }
@@ -381,7 +381,7 @@ public:
 
       // x,y,z,qx,qy,qz,qw
       case 7: {
-        const rclcpp::Time    stamp(0);
+        const rclcpp::Time    stamp(0, 0, clock_->get_clock_type());
         const tf2::Vector3 translation(num(offset[0]), num(offset[1]), num(offset[2]));
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[6]), num(offset[3]), num(offset[4]), num(offset[5])).normalized();
