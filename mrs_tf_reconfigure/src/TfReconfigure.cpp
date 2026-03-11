@@ -44,25 +44,25 @@ TfReconfigure::TfReconfigure(rclcpp::NodeOptions options) : Node("TfReconfigure"
   std::function<void(const double &)> callback = std::bind(&TfReconfigure::callbackReconfigure, this, std::placeholders::_1);
 
   // child
-  reconfigure_server_->register_param("child.o_pitch", &drs_params_.child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("child.o_roll", &drs_params_.child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("child.o_yaw", &drs_params_.child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("child.o_pitch", &drs_params_.child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("child.o_roll", &drs_params_.child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("child.o_yaw", &drs_params_.child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
   reconfigure_server_->register_param("child.x", &drs_params_.child_x, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("child.y", &drs_params_.child_y, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("child.z", &drs_params_.child_z, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
 
   // g_child
-  reconfigure_server_->register_param("g_child.o_pitch", &drs_params_.g_child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("g_child.o_roll", &drs_params_.g_child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("g_child.o_yaw", &drs_params_.g_child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_child.o_pitch", &drs_params_.g_child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("g_child.o_roll", &drs_params_.g_child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("g_child.o_yaw", &drs_params_.g_child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
   reconfigure_server_->register_param("g_child.x", &drs_params_.g_child_x, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("g_child.y", &drs_params_.g_child_y, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("g_child.z", &drs_params_.g_child_z, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
 
   // g_g_child
-  reconfigure_server_->register_param("g_g_child.o_pitch", &drs_params_.g_g_child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("g_g_child.o_roll", &drs_params_.g_g_child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
-  reconfigure_server_->register_param("g_g_child.o_yaw", &drs_params_.g_g_child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.14, 3.14), callback);
+  reconfigure_server_->register_param("g_g_child.o_pitch", &drs_params_.g_g_child_o_pitch, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("g_g_child.o_roll", &drs_params_.g_g_child_o_roll, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
+  reconfigure_server_->register_param("g_g_child.o_yaw", &drs_params_.g_g_child_o_yaw, 0.0, mrs_lib::DynparamMgr::range_t<double>(-3.141, 3.141), callback);
   reconfigure_server_->register_param("g_g_child.x", &drs_params_.g_g_child_x, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("g_g_child.y", &drs_params_.g_g_child_y, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
   reconfigure_server_->register_param("g_g_child.z", &drs_params_.g_g_child_z, 0.0, mrs_lib::DynparamMgr::range_t<double>(-100.0, 100.0), callback);
