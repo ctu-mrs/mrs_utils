@@ -35,6 +35,12 @@
 namespace mrs_tf_connector
 {
 
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
 class TFConnector : public mrs_lib::Node {
 public:
   /* TFConnector //{ */
@@ -102,8 +108,13 @@ public:
 
     //}
 
-    if (m_max_update_period > 0)
-      m_tim_tf = node_->create_wall_timer(std::chrono::duration<double>(1.0 / m_max_update_period), std::bind(&TFConnector::timer_callback, this));
+    if (m_max_update_period > 0) {
+      mrs_lib::TimerHandlerOptions thopts;
+      thopts.node      = node_;
+      thopts.autostart = true;
+
+      m_tim_tf = std::make_shared<TimerType>(thopts, rclcpp::Rate(1.0 / m_max_update_period, clock_), std::bind(&TFConnector::timer_callback, this));
+    }
 
     RCLCPP_INFO(node_->get_logger(), "Initialized");
   }
@@ -156,7 +167,7 @@ private:
 
   mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage> m_sub_tf;
   mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>  m_pub_tf;
-  rclcpp::TimerBase::SharedPtr                         m_tim_tf;
+  std::shared_ptr<TimerType>                           m_tim_tf;
   std::shared_ptr<mrs_lib::DynparamMgr>                m_ddynrec;
 
   rclcpp::Node::SharedPtr      node_;
