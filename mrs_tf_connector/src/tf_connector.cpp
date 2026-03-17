@@ -7,6 +7,7 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+// #include <tf2_ros/qos.hpp>
 
 // Msgs
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -87,6 +88,7 @@ public:
 
     mrs_lib::PublisherHandlerOptions phopts;
     phopts.node = node_;
+    // phopts.qos = tf2_ros::DynamicBroadcasterQoS();
 
     m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "tf_out");
 
@@ -101,6 +103,7 @@ public:
 
     mrs_lib::SubscriberHandlerOptions shopts;
     shopts.node = node_;
+    //shopts.qos = tf2_ros::DynamicListenerQoS();
 
     m_tf_buffer       = std::make_unique<tf2_ros::Buffer>(clock_);
     m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
@@ -247,8 +250,7 @@ public:
           new_tf = m_tf_buffer->lookupTransform(equal_frame_id, root_frame_id, rclcpp::Time(0, 0, clock_->get_clock_type()));
         }
         catch (const tf2::TransformException& ex) {
-          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(),
-                            ex.what());
+          RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Error during transform from \"%s\" frame to \"%s\" frame.\n\tMSG: %s", root_frame_id.c_str(), equal_frame_id.c_str(), ex.what());
           continue;
         }
       }
@@ -386,8 +388,7 @@ public:
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[6]), num(offset[3]), num(offset[4]), num(offset[5])).normalized();
         if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all()) {
-          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
-                               << "), skipping");
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
           return std::nullopt;
         }
         // tf2 expects parameters of the constructor to be x, y, z, w
@@ -402,8 +403,7 @@ public:
         // Eigen expects parameters of the constructor to be w, x, y, z
         const Eigen::Quaterniond q = Eigen::Quaterniond(num(offset[7]), num(offset[4]), num(offset[5]), num(offset[6])).normalized();
         if (q.vec().hasNaN() || q.coeffs().array().cwiseEqual(0.0).all()) {
-          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose()
-                               << "), skipping");
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has an invalid rotation (" << q.coeffs().transpose() << "), skipping");
           return std::nullopt;
         }
         // tf2 expects parameters of the constructor to be x, y, z, w
@@ -412,8 +412,7 @@ public:
       }
 
       default: {
-        RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has incorrect size (" << offset.size()
-                             << ", has to be 4, 5, 7 or 8), skipping");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "An offset of the " << it << ". connection has incorrect size (" << offset.size() << ", has to be 4, 5, 7 or 8), skipping");
         return std::nullopt;
       }
     }
@@ -466,16 +465,17 @@ public:
       return ret;  // Return identity transforms as defaults
     }
 
-    if (offsets_yaml["intrinsic"]) {
-      const auto offsets_in_opt = parse_offset_keypoints(offsets_yaml["intrinsic"], it);
-      if (offsets_in_opt.has_value()) {
+    for (auto mem_it = offsets_yaml.begin(); mem_it != offsets_yaml.end(); ++mem_it) {
+      const auto mem_name = mem_it->first.as<std::string>();
+      if (mem_name == "intrinsic") {
+        const auto offsets_in_opt = parse_offset_keypoints(offsets_yaml["intrinsic"], it);
+        if (!offsets_in_opt.has_value())
+          return std::nullopt;
         ret.first = offsets_in_opt.value();
-      }
-    }
-
-    if (offsets_yaml["extrinsic"]) {
-      const auto offsets_ex_opt = parse_offset_keypoints(offsets_yaml["extrinsic"], it);
-      if (offsets_ex_opt.has_value()) {
+      } else if (mem_name == "extrinsic") {
+        const auto offsets_ex_opt = parse_offset_keypoints(offsets_yaml["extrinsic"], it);
+        if (!offsets_ex_opt.has_value())
+          return std::nullopt;
         ret.second = offsets_ex_opt.value();
       }
     }
@@ -487,56 +487,73 @@ public:
   /* parse_connections() method //{ */
   std::optional<connection_vec_t> parse_connections(const YAML::Node& config) const {
     if (!config["connections"] || !config["connections"].IsSequence()) {
-      RCLCPP_ERROR(node_->get_logger(), "The 'connections' in YAML is not a valid sequence. Cannot parse.");
+      RCLCPP_ERROR(node_->get_logger(), "The 'connections' parameter has to be an array, but it's not. Cannot parse.");
       return std::nullopt;
     }
 
     const auto& yaml_connections = config["connections"];
-    if (yaml_connections.size() == 0) {
-      RCLCPP_ERROR(node_->get_logger(), "The 'connections' parameter is empty. Cannot parse.");
-      return std::nullopt;
-    }
-
     connection_vec_t ret;
     ret.reserve(yaml_connections.size());
     const auto now = clock_->now();
 
     for (size_t it = 0; it < yaml_connections.size(); it++) {
       const auto& conn_yaml = yaml_connections[it];
-      
+
       if (!conn_yaml.IsMap()) {
         RCLCPP_ERROR_STREAM(node_->get_logger(), "Invalid type of the " << it << ". member of 'connections'. Cannot parse.");
         return std::nullopt;
       }
 
       if (!conn_yaml["root_frame_id"] || !conn_yaml["equal_frame_id"]) {
-        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' is missing either the 'root_frame_id' or 'equal_frame_id' member. Cannot parse.");
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' is missing either the '"
+                             << "root_frame_id" << "' or '" << "equal_frame_id" << "' member. Cannot parse.");
         return std::nullopt;
       }
 
-      auto con_ptr = std::make_shared<frame_connection_t>();
+      auto new_con_ptr  = std::make_shared<frame_connection_t>();
+      bool parsed_root  = false;
+      bool parsed_equal = false;
 
-      // Parse frame IDs from YAML
-      con_ptr->root_frame_id = conn_yaml["root_frame_id"].as<std::string>();
-      con_ptr->equal_frame_id = conn_yaml["equal_frame_id"].as<std::string>();
-      con_ptr->same_frames = (con_ptr->root_frame_id == con_ptr->equal_frame_id);
-      con_ptr->last_update = now;
+      for (auto mem_it = conn_yaml.begin(); mem_it != conn_yaml.end(); ++mem_it) {
+        const auto mem_name = mem_it->first.as<std::string>();
+        const auto& mem     = mem_it->second;
 
-      // Parse offsets from YAML if they exist
-      if (conn_yaml["offsets"]) {
-        const auto offsets_opt = parse_offsets(conn_yaml["offsets"], it);
-        if (offsets_opt.has_value()) {
-          const auto& offsets = offsets_opt.value();
-          con_ptr->offsets_in = offsets.first;
-          con_ptr->offsets_ex = offsets.second;
+        // check types
+        if ((mem_name == "root_frame_id" && !mem.IsScalar()) ||
+            (mem_name == "equal_frame_id" && !mem.IsScalar()) ||
+            (mem_name == "offsets" && !mem.IsMap())) {
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has a wrong type of the '" << mem_name << "' member. Cannot parse.");
+          return std::nullopt;
         }
-      } else {
-        // Use identity transforms as defaults
-        con_ptr->offsets_in = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
-        con_ptr->offsets_ex = {offset_keyframe_t{rclcpp::Time(0, 0, clock_->get_clock_type()), tf2::Transform::getIdentity()}};
+
+        if (mem_name == "root_frame_id") {
+          new_con_ptr->root_frame_id = mem.as<std::string>();
+          parsed_root                = true;
+        } else if (mem_name == "equal_frame_id") {
+          new_con_ptr->equal_frame_id = mem.as<std::string>();
+          parsed_equal                = true;
+        } else if (mem_name == "offsets") {
+          const auto offsets_opt = parse_offsets(mem, it);
+          if (!offsets_opt.has_value())
+            return std::nullopt;
+          const auto& offsets      = offsets_opt.value();
+          new_con_ptr->offsets_in  = offsets.first;
+          new_con_ptr->offsets_ex  = offsets.second;
+        } else {
+          RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' has an unexpected member '" << mem_name << "'. Aborting parse.");
+          return std::nullopt;
+        }
       }
 
-      ret.push_back(con_ptr);
+      if (!parsed_root || !parsed_equal) {
+        RCLCPP_ERROR_STREAM(node_->get_logger(), "The " << it << ". member of 'connections' misses a compulsory member '" << "root_frame_id" << "' or '" << "equal_frame_id" << "'. Aborting parse.");
+        return std::nullopt;
+      }
+
+      new_con_ptr->same_frames = new_con_ptr->root_frame_id == new_con_ptr->equal_frame_id;
+      new_con_ptr->last_update = now;
+
+      ret.push_back(new_con_ptr);
     }
 
     return ret;
