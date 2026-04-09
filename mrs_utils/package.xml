@@ -17,6 +17,7 @@
   <depend>builtin_interfaces</depend>
 
   <depend>mrs_odometry_republisher</depend>
+  <depend>mrs_tf_reconfigure</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
