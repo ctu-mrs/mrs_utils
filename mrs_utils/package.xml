@@ -15,8 +15,9 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>builtin_interfaces</depend>
-
   <depend>mrs_odometry_republisher</depend>
+  <depend>mrs_tf_connector</depend>
+  <depend>mrs_tf_mirror</depend>
   <depend>mrs_tf_reconfigure</depend>
 
   <export>
