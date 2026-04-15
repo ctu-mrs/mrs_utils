@@ -107,7 +107,7 @@ public:
 
     m_tf_buffer       = std::make_unique<tf2_ros::Buffer>(clock_);
     m_tf_listener_ptr = std::make_unique<tf2_ros::TransformListener>(*m_tf_buffer);
-    m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "tf_in", &TFConnector::tf_callback, this);
+    m_sub_tf          = mrs_lib::SubscriberHandler<tf2_msgs::msg::TFMessage>(shopts, "~/tf_in", &TFConnector::tf_callback, this);
 
     //}
 
