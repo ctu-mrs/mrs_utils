@@ -50,7 +50,7 @@ public:
     clock_ = node_->get_clock();
 
     /* load parameters //{ */
- 
+
     RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
     mrs_lib::ParamLoader pl(node_);
 
@@ -84,13 +84,13 @@ public:
 
     //}
 
-    /* publishers //{ */ 
+    /* publishers //{ */
 
     mrs_lib::PublisherHandlerOptions phopts;
     phopts.node = node_;
     // phopts.qos = tf2_ros::DynamicBroadcasterQoS();
 
-    m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "tf_out");
+    m_pub_tf  = mrs_lib::PublisherHandler<tf2_msgs::msg::TFMessage>(phopts, "~/tf_out");
 
     m_ddynrec = std::make_shared<mrs_lib::DynparamMgr>(node_, mutex_drs_params_);
     m_ddynrec->get_param_provider().copyYamls(pl.getParamProvider());

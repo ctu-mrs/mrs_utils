@@ -91,8 +91,8 @@ def generate_launch_description():
 
         parameters=[
             {'uav_name': uav_name},
-            {'use_sim_time': use_sim_time},
-            {'public_config': this_pkg_path + '/config/tf_connector_offsets.yaml'},
+            {"use_sim_time": use_sim_time},
+            {"public_config": this_pkg_path + "/config/tf_connector.yaml"},
         ],
 
         remappings=[
