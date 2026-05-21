@@ -194,7 +194,7 @@ void OdometryRepublisher::initialize() {
   phopts.node = node_;
   phopts.qos  = rclcpp::SensorDataQoS();
 
-  ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(phopts, "~/odom_out");
+  ph_odometry_ = mrs_lib::PublisherHandler<nav_msgs::msg::Odometry>(phopts, "~/odometry_out");
 
   RCLCPP_INFO(node_->get_logger(), "initialized");
 
