@@ -46,7 +46,7 @@ add_library(MrsUtils_MRSTFReconfigure SHARED
 target_link_libraries(MrsUtils_MRSTFReconfigure
   mrs_lib::mrs_lib
   ${mrs_msgs_TARGETS}
-  mrs_modules_msgs::mrs_modules_msgs
+  ${mrs_modules_msgs_TARGETS}
   ${nav_msgs_TARGETS}
   rclcpp::rclcpp
   rclcpp_components::component
