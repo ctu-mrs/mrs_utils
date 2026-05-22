@@ -64,7 +64,7 @@ foreach(library IN LISTS LIBRARIES)
     tf2_ros::tf2_ros
     tf2_eigen::tf2_eigen
     tf2_geometry_msgs::tf2_geometry_msgs
-    visualization_msgs::visualization_msgs
+    ${visualization_msgs_TARGETS}
     mrs_lib::mrs_lib
     ${geometry_msgs_TARGETS}
     ${BULLET_LIBRARIES}
