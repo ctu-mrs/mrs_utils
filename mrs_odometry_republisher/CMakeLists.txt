@@ -46,11 +46,11 @@ target_link_libraries(MrsOdometryRepublisher_Republisher
   pluginlib::pluginlib
   rclcpp::rclcpp
   rclcpp_components::component
-  geometry_msgs::geometry_msgs
-  nav_msgs::nav_msgs
-  sensor_msgs::sensor_msgs
-  std_msgs::std_msgs
-  std_srvs::std_srvs
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
   tf2_geometry_msgs::tf2_geometry_msgs
   ${BULLET_LIBRARIES}
 )
