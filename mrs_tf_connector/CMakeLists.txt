@@ -35,6 +35,8 @@ set(DEPENDENCIES
   tf2
   tf2_ros
   tf2_sensor_msgs
+  Bullet
+  visualization_msgs
 )
 
 set(LIBRARIES
@@ -54,14 +56,25 @@ add_library(MrsUtils_MRSTFConnector SHARED
 )
 
 foreach(library IN LISTS LIBRARIES)
-  ament_target_dependencies(${library}
-    ${DEPENDENCIES}
+  target_link_libraries(${library}
+    # ${DEPENDENCIES}
+    rclcpp::rclcpp
+    rclcpp_components::component
+    tf2::tf2
+    tf2_ros::tf2_ros
+    tf2_eigen::tf2_eigen
+    tf2_geometry_msgs::tf2_geometry_msgs
+    visualization_msgs::visualization_msgs
+    mrs_lib::mrs_lib
+    ${geometry_msgs_TARGETS}
+    ${BULLET_LIBRARIES}
   )
 
   target_include_directories(${library}
     PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-      $<INSTALL_INTERFACE:include>
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
+    ${BULLET_INCLUDE_DIRS}
   )
 endforeach()
 

@@ -34,16 +34,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra)
 endif()
 
-set(LIBRARIES
-  MrsTfMirror_TfMirror
-)
-
 add_library(MrsTfMirror_TfMirror SHARED
   src/tf_mirror.cpp
 )
 
-ament_target_dependencies(MrsTfMirror_TfMirror
-  ${DEPENDENCIES}
+set(LIBRARIES
+  MrsTfMirror_TfMirror
+)
+
+
+target_link_libraries(MrsTfMirror_TfMirror
+  ${mrs_lib_TARGETS}
+  ${mrs_msgs_TARGETS}
+  ${mrs_modules_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${rclcpp_TARGETS}
+  ${rclcpp_components_TARGETS}
+  ${tf2_TARGETS}
+  ${tf2_ros_TARGETS}
+  ${tf2_sensor_msgs_TARGETS}
 )
 
 target_include_directories(MrsTfMirror_TfMirror

@@ -2,8 +2,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/convert.h>
+// #include <tf2/LinearMath/Quaternion.h>
+#include <LinearMath/btQuaternion.h>
+#include <tf2/convert.hpp>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
