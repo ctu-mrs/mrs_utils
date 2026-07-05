@@ -20,6 +20,7 @@ set(DEPENDENCIES
   std_msgs
   std_srvs
   tf2_geometry_msgs
+  Bullet
 )
 
 foreach(DEP IN LISTS DEPENDENCIES)
@@ -35,9 +36,23 @@ add_library(MrsOdometryRepublisher_Republisher SHARED
   src/odometry_republisher.cpp
 )
 
+target_include_directories(MrsOdometryRepublisher_Republisher PUBLIC ${BULLET_INCLUDE_DIRS})
+
 # Apply dependencies to the target
-ament_target_dependencies(MrsOdometryRepublisher_Republisher
-  ${DEPENDENCIES}
+target_link_libraries(MrsOdometryRepublisher_Republisher
+  tf2::tf2
+  tf2_ros::tf2_ros
+  mrs_lib::mrs_lib
+  pluginlib::pluginlib
+  rclcpp::rclcpp
+  rclcpp_components::component
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
+  tf2_geometry_msgs::tf2_geometry_msgs
+  ${BULLET_LIBRARIES}
 )
 
 # Register the component

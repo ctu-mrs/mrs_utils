@@ -43,8 +43,17 @@ add_library(MrsUtils_MRSTFReconfigure SHARED
   src/TfReconfigure.cpp
 )
 
-ament_target_dependencies(MrsUtils_MRSTFReconfigure
-  ${DEPENDENCIES}
+target_link_libraries(MrsUtils_MRSTFReconfigure
+  mrs_lib::mrs_lib
+  ${mrs_msgs_TARGETS}
+  ${mrs_modules_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  rclcpp::rclcpp
+  rclcpp_components::component
+  ${sensor_msgs_TARGETS}
+  tf2::tf2
+  tf2_ros::tf2_ros
+  tf2_sensor_msgs::tf2_sensor_msgs
 )
 
 target_include_directories(MrsUtils_MRSTFReconfigure
