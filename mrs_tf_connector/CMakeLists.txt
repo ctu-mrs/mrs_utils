@@ -35,7 +35,6 @@ set(DEPENDENCIES
   tf2
   tf2_ros
   tf2_sensor_msgs
-  Bullet
   visualization_msgs
 )
 
@@ -67,14 +66,12 @@ foreach(library IN LISTS LIBRARIES)
     ${visualization_msgs_TARGETS}
     mrs_lib::mrs_lib
     ${geometry_msgs_TARGETS}
-    ${BULLET_LIBRARIES}
   )
 
   target_include_directories(${library}
     PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>"
-    ${BULLET_INCLUDE_DIRS}
   )
 endforeach()
 

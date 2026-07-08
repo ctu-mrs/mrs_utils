@@ -20,7 +20,6 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>tf2</depend>
-  <build_depend>bullet</build_depend>
   <depend>tf2_ros</depend>
   <depend>tf2_sensor_msgs</depend>
 

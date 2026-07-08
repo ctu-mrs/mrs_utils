@@ -22,7 +22,6 @@
   <depend>tf2_ros</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>
-  <build_depend>bullet</build_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
