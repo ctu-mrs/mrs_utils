@@ -24,10 +24,11 @@ add_library(MrsSensorInfo_SensorInfo SHARED
 )
 
 target_link_libraries(MrsSensorInfo_SensorInfo
-  mrs_lib::mrs_lib
-  ${mrs_modules_msgs_TARGETS}
-  rclcpp::rclcpp
-  rclcpp_components::component
+  PRIVATE
+    mrs_lib::mrs_lib
+    ${mrs_modules_msgs_TARGETS}
+    rclcpp::rclcpp
+    rclcpp_components::component
 )
 
 rclcpp_components_register_nodes(
