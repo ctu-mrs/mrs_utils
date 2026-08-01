@@ -81,11 +81,13 @@ TfReconfigure::TfReconfigure(rclcpp::NodeOptions options) : Node("TfReconfigure"
 /* broadcastTransforms() //{ */
 
 void TfReconfigure::broadcastTransforms() {
+
   if (!is_initialized_) {
     return;
   }
 
   if (modified_g_g_child_) {
+
     std::scoped_lock lock(mutex_tf_);
 
     geometry_msgs::msg::TransformStamped ts1;
@@ -110,6 +112,7 @@ void TfReconfigure::broadcastTransforms() {
     br_->sendTransform(ts3);
 
   } else if (modified_g_child_) {
+
     std::scoped_lock lock(mutex_tf_);
 
     geometry_msgs::msg::TransformStamped ts1;
@@ -127,6 +130,7 @@ void TfReconfigure::broadcastTransforms() {
     br_->sendTransform(ts2);
 
   } else {
+
     std::scoped_lock lock(mutex_tf_);
 
     geometry_msgs::msg::TransformStamped ts1;
@@ -143,10 +147,13 @@ void TfReconfigure::broadcastTransforms() {
 /* timerTf() //{ */
 
 void TfReconfigure::timerTf() {
-  if (!is_initialized_)
+
+  if (!is_initialized_) {
     return;
+  }
 
   if (params_dirty_) {
+
     auto drs_params = mrs_lib::get_mutexed(mutex_reconfigure_, drs_params_);
 
     modified_g_child_ |= (drs_params.g_child_o_roll != 0.0) || (drs_params.g_child_o_pitch != 0.0) || (drs_params.g_child_o_yaw != 0.0) ||
@@ -189,6 +196,11 @@ void TfReconfigure::timerTf() {
 
     broadcastTransforms();
     broadcastTransforms();
+    clock_->sleep_for(std::chrono::duration<double>(0.1));
+    broadcastTransforms();
+    broadcastTransforms();
+    broadcastTransforms();
+    clock_->sleep_for(std::chrono::duration<double>(0.1));
 
     geometry_msgs::msg::TransformStamped tf;
 
@@ -218,8 +230,8 @@ void TfReconfigure::timerTf() {
 
     m.getRPY(sim_roll, sim_pitch, sim_yaw);
 
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Angles for gazebo:  R: " << sim_roll << "  P: " << sim_pitch << "  Y: " << sim_yaw);
-    RCLCPP_INFO_STREAM(node_->get_logger(), "Angles for tf_static:   " << sim_yaw << " " << sim_pitch << " " << sim_roll);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Angles for gazebo (extrinsic RPY): R: " << sim_roll << "  P: " << sim_pitch << "  Y: " << sim_yaw);
+    RCLCPP_INFO_STREAM(node_->get_logger(), "Angles for tf_static [intrinsic YPR with unnamed arguments]: '--yaw', '" << sim_yaw << "', '--pitch', '" << sim_pitch << "', '--roll', '" << sim_roll << "',");
 
     params_dirty_ = false;
   } else
@@ -231,6 +243,7 @@ void TfReconfigure::timerTf() {
 /* //{ callbackReconfigure() */
 
 void TfReconfigure::callbackReconfigure([[maybe_unused]] const double &value) {
+
   if (!is_initialized_) {
     return;
   }
