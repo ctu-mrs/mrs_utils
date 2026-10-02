@@ -7,7 +7,7 @@ from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, IfElseSubstitution, PythonExpression, PathJoinSubstitution, EnvironmentVariable
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -71,6 +71,30 @@ def generate_launch_description():
 
     # #} end of log_level
 
+    # #{ custom_config
+
+    custom_config = LaunchConfiguration("custom_config")
+
+    ld.add_action(
+        DeclareLaunchArgument(
+            "custom_config",
+            default_value="",
+            description="Path to the custom configuration file. The path can be absolute, starting with '/' or relative to the current working directory",
+        )
+    )
+
+    # behaviour:
+    #     custom_config == "" => custom_config: ""
+    #     custom_config == "/<path>" => custom_config: "/<path>"
+    #     custom_config == "<path>" => custom_config: "$(pwd)/<path>"
+    custom_config = IfElseSubstitution(
+        condition=PythonExpression(['"', custom_config, '" != "" and ', 'not "', custom_config, '".startswith("/")']),
+        if_value=PathJoinSubstitution([EnvironmentVariable("PWD"), custom_config]),
+        else_value=custom_config,
+    )
+
+    # #} end of custom_config
+
     # #{ default_node
 
     default_node = ComposableNode(
@@ -81,6 +105,7 @@ def generate_launch_description():
         parameters=[
             {"use_sim_time": use_sim_time},
             {"public_config": this_pkg_path + "/config/tf_connector.yaml"},
+            {"custom_config": custom_config},
         ],
         remappings=[
             # subscribers
