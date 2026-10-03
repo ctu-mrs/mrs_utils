@@ -54,6 +54,14 @@ public:
     RCLCPP_INFO(node_->get_logger(), "LOADING STATIC PARAMETERS");
     mrs_lib::ParamLoader pl(node_);
 
+    std::string custom_config_path;
+    pl.loadParam("custom_config", custom_config_path, std::string(""));
+
+    // the first added file takes precedence, so the custom config overrides the public one
+    if (custom_config_path != "") {
+      pl.addYamlFile(custom_config_path);
+    }
+
     std::string public_config_path;
     pl.loadParam("public_config", public_config_path);
     pl.addYamlFile(public_config_path);
@@ -62,10 +70,18 @@ public:
     pl.loadParam("ignore_older_messages", m_ignore_older_msgs);
     pl.loadParam("max_update_period", m_max_update_period);
 
-    // Load and parse connections directly from YAML
+    // Load and parse connections directly from YAML, the custom config replaces the whole list if it has one
     YAML::Node config;
     try {
       config = YAML::LoadFile(public_config_path);
+
+      if (custom_config_path != "") {
+        const YAML::Node custom_config = YAML::LoadFile(custom_config_path);
+
+        if (custom_config["connections"]) {
+          config = custom_config;
+        }
+      }
     } catch (const YAML::Exception& e) {
       RCLCPP_ERROR(node_->get_logger(), "Failed to load YAML config: %s", e.what());
       rclcpp::shutdown();
